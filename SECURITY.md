@@ -5,7 +5,7 @@ This document summarises the security findings from the initial review
 
 ---
 
-## ✅ Fixed in this PR
+## ✅ Fixed in PR #1 (initial hardening)
 
 | # | Severity | Finding | Fix |
 |---|----------|---------|-----|
@@ -14,6 +14,21 @@ This document summarises the security findings from the initial review
 | 3 | **High** | Plaintext user password stored in `SharedPreferences` ("Remember Me" feature) | Password storage removed entirely. Only the username (non-secret) is retained as a UI convenience. |
 | 4 | **High** | Session auth tokens (`matrix_auth_token`, `rocketchat_auth_token`, `rocketchat_user_id`) stored unencrypted in `SharedPreferences` | Migrated to `flutter_secure_storage` (Android Keystore / iOS Keychain). A one-time migration transparently moves existing tokens on first launch. |
 | 5 | **High** | Auth token and FCM push token printed to debug log (`print('🔒 [AUTH TOKEN] ...')`) | Log statements removed. |
+
+---
+
+## ✅ Fixed in PR #2 (this PR – follow-up hardening)
+
+| # | Severity | Finding | Fix |
+|---|----------|---------|-----|
+| 6 | **High** | Logout did not call `SessionManager.clearSession()` or clear `MatrixService` in-memory state | `_onLogout()` now `await`s `MatrixService.logout()` (server-side `/api/v1/logout` + in-memory + secure-storage clear) and `SessionManager.clearSession()`. |
+| 7 | **Medium** | No server-side session invalidation on logout (OPN-2) | `MatrixService.logout()` now calls `POST /api/v1/logout` (with auth headers) before clearing local state. Network failure is best-effort and does not block local cleanup. |
+| 8 | **Medium** | Verbose subscription data (room IDs, names, unread counts, timestamps) logged unconditionally (OPN-5) | Wrapped in `assert((){}())` so the logs are compiled out of release builds. |
+| 9 | **Medium** | Auth-token-bearing URLs (`rc_uid`, `rc_token` query params) appeared in error log messages (`fetchAuthedBytes`, `probeUrl`) | Added `_safeUri()` helper that strips `rc_uid`/`rc_token` from log-bound URI strings; all URL-containing error messages updated. |
+| 10 | **Low** | Upload endpoint debug prints leaked file paths, room IDs, and full response bodies (which may contain authed URLs) | Removed `print('Uploading file: …')`, `print('Full URI: …')` lines; response-body prints (`rooms.media ←`, `setAvatar ←`, `chat.postMessage(file) ←`) replaced with status-code-only debug-guarded prints. |
+| 11 | **Low** | Avatar URL (auth-token-bearing) logged unconditionally in `_loadUserProfile` | Print statement removed. |
+| 12 | **Low** | Missing `shared_preferences` import in `report_screen.dart` (compile-time bug) | Import added. |
+| 13 | **Low** | No explicit Android network security policy; cleartext HTTP not explicitly prohibited | Added `android/app/src/main/res/xml/network_security_config.xml` disabling cleartext traffic app-wide and scoping the backend domains. Wired into `AndroidManifest.xml` via `android:networkSecurityConfig`. |
 
 ---
 
@@ -28,21 +43,14 @@ parameters. This means auth credentials appear in:
 - HTTP Referer headers sent to third-party CDNs
 - Device browser history (web build)
 
-**Recommended fix:** Upgrade the backend (Rocket.Chat) to use signed, expiring
+**What was improved:** Log messages no longer expose these URLs (see fix #9
+above). However, the tokens are still embedded in the URLs used by
+`CachedNetworkImage` and passed across widget trees. Eliminating them
+entirely requires a backend change.
+
+**Remaining fix:** Upgrade the backend (Rocket.Chat) to use signed, expiring
 media tokens, or proxy media downloads through a short-lived signed URL
 endpoint so the main auth token is never embedded in a URL.
-
----
-
-### OPN-2 – Session tokens not invalidated on server at logout (Medium)
-**Location:** `lib/session_manager.dart` → `clearSession()`
-
-**Detail:** Clearing local storage does not call the Rocket.Chat
-`/api/v1/logout` endpoint. A stolen token snapshot remains valid until it
-naturally expires on the server.
-
-**Recommended fix:** Call `POST /api/v1/logout` (with auth headers) before
-clearing local storage during explicit logout.
 
 ---
 
@@ -50,13 +58,21 @@ clearing local storage during explicit logout.
 **Location:** all `http.get` / `http.post` calls in `matrix_service.dart` and
 `reports/report_screen.dart`.
 
-**Detail:** The app trusts the device's CA store. On a device with a custom CA
-installed (e.g. corporate MDM, or a compromised device) traffic to
+**Detail:** The app trusts the device's system CA store. On a device with a
+custom CA installed (e.g. corporate MDM, or a compromised device) traffic to
 `app.icsportals.org` and `reports.icsportals.org` could be intercepted.
 
-**Recommended fix:** Implement certificate pinning via `dart:io`
-`SecurityContext` or the `ssl_pinning_plugin` package, pinning the server's
-leaf or intermediate certificate public key.
+**What was improved:** The Android network security config added in fix #13
+above excludes user-installed CA certificates from the trust store in release
+builds, which materially reduces the MITM risk without requiring certificate
+pinning.
+
+**Remaining fix:** For a stronger guarantee, implement certificate pinning via
+`dart:io SecurityContext` or `ssl_pinning_plugin`, pinning the server's leaf
+or intermediate certificate public-key hash.  This requires:
+1. Obtaining the current public-key hash(es) from the server team.
+2. Establishing a pin-rotation plan so the app can be updated before certs
+   expire without locking users out.
 
 ---
 
@@ -75,24 +91,6 @@ the key is not restricted in the Firebase / Google Cloud Console to:
 **Recommended fix:** In the Google Cloud Console → Credentials, restrict the
 key to the package name `app.icsportals.ics_messenger_app` and the production
 signing certificate SHA-1.
-
----
-
-### OPN-5 – Verbose subscription data logged in debug mode (Low)
-**Location:** `lib/matrix_service.dart` → `fetchJoinedRoomIds()` (lines ~303–311)
-
-**Detail:** Every subscription record (room id, name, unread count, last-seen
-timestamp) is printed via `print()`. This data is visible in ADB logcat and
-may be captured by third-party crash-reporting SDKs.
-
-**Recommended fix:** Wrap these `print` calls in a debug-only guard:
-```dart
-assert(() {
-  print('SUB rid=...');
-  return true;
-}());
-```
-or remove them entirely before production release.
 
 ---
 

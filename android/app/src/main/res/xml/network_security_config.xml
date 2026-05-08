@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network Security Config – ICS Messenger App
+
+  Policy:
+  - All traffic to app.icsportals.org and reports.icsportals.org must use TLS.
+  - Cleartext (plain HTTP) is explicitly prohibited for all destinations.
+  - The app trusts the system CA store only; no additional user-installed CAs
+    are trusted in release builds, reducing the risk of interception by
+    corporate proxies or user-installed root certificates.
+  - Certificate pinning (OPN-3) is NOT yet implemented here because it
+    requires coordination with the server team to obtain leaf/intermediate
+    public key hashes and a rotation plan.  When ready, add a
+    <pin-set> block inside the <domain-config> for each domain.
+-->
+<network-security-config>
+    <!-- Global default: no cleartext traffic permitted anywhere. -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system CAs only (no user-added CAs in production). -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Primary Rocket.Chat backend -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">app.icsportals.org</domain>
+    </domain-config>
+
+    <!-- Report submission backend -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">reports.icsportals.org</domain>
+    </domain-config>
+</network-security-config>

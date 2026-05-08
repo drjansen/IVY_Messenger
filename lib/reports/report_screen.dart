@@ -209,6 +209,8 @@ class _ReportScreenState extends State<ReportScreen> {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(
                       builder: (context) => MainScreen(
+                        // MainScreen.accessToken is a legacy parameter name;
+                        // it holds the Rocket.Chat auth token throughout the app.
                         accessToken: _authToken ?? '',
                         username: SessionManager.username ?? username ?? '',
                         initialTab: 0,

@@ -77,8 +77,14 @@ class MatrixService {
               headers: _headers,
             )
             .timeout(const Duration(seconds: 10));
-      } catch (_) {
+      } catch (e) {
         // Network failure is non-fatal; local cleanup still proceeds below.
+        // Log at debug level so developers can see transient connectivity issues.
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ MatrixService.logout: server-side invalidation failed: $e');
+          return true;
+        }());
       }
     }
     await clearSession();

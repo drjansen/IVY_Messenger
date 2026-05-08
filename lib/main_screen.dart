@@ -93,7 +93,7 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  void _onLogout() async {
+  Future<void> _onLogout() async {
     debugPrint('UserBar: Logout triggered in MainScreen');
     // Server-side session invalidation + in-memory/storage clear.
     await MatrixService.logout();

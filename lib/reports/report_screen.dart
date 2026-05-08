@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../main_screen.dart';
 import 'package:ics_messenger_app/session_manager.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -75,17 +74,15 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _loadAuthHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _authToken = prefs.getString('rocketchat_auth_token') ?? '';
-      _userId = prefs.getString('rocketchat_user_id') ?? '';
+      _authToken = SessionManager.rocketchatAuthToken ?? '';
+      _userId = SessionManager.rocketchatUserId ?? '';
     });
   }
 
   Future<void> _loadAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _accessToken = prefs.getString('access_token') ?? '';
+      _accessToken = SessionManager.rocketchatAuthToken ?? '';
     });
   }
 

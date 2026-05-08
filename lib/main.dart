@@ -89,7 +89,7 @@ void main() async {
 
   FirebaseMessaging.instance.getToken().then((token) {
     if (token != null) {
-      print('🔑 [FCM Token] $token');
+      // FCM token obtained — register with push server after login.
     }
   });
 

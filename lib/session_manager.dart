@@ -1,12 +1,14 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Manages user session state.
+/// Manages Rocket.Chat user session state.
 ///
 /// Security model:
 /// - Auth tokens (rocketchatAuthToken, rocketchatUserId) are stored in the
 ///   platform secure keystore (Android Keystore / iOS Keychain) via
 ///   flutter_secure_storage.  They are never written to SharedPreferences.
+///   (MatrixService manages its own matrix_auth_token / matrix_user_id tokens
+///   identically, using its own FlutterSecureStorage instance.)
 /// - The username is stored only in SharedPreferences as a non-sensitive UI
 ///   convenience (pre-fills the login field when "Remember Me" is on).
 class SessionManager {

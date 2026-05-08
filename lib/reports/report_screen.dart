@@ -36,7 +36,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
   String? _authToken;
   String? _userId;
-  String? _accessToken;
 
   @override
   void initState() {
@@ -51,7 +50,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
     _loadUsername();
     _loadAuthHeaders();
-    _loadAccessToken();
   }
 
   @override
@@ -77,12 +75,6 @@ class _ReportScreenState extends State<ReportScreen> {
     setState(() {
       _authToken = SessionManager.rocketchatAuthToken ?? '';
       _userId = SessionManager.rocketchatUserId ?? '';
-    });
-  }
-
-  Future<void> _loadAccessToken() async {
-    setState(() {
-      _accessToken = SessionManager.rocketchatAuthToken ?? '';
     });
   }
 
@@ -217,7 +209,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(
                       builder: (context) => MainScreen(
-                        accessToken: _accessToken ?? '',
+                        accessToken: _authToken ?? '',
                         username: SessionManager.username ?? username ?? '',
                         initialTab: 0,
                       ),

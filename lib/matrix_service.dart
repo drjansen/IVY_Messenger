@@ -45,6 +45,51 @@ class MatrixService {
     await prefs.remove('matrix_user_id');
   }
 
+  /// Clears all in-memory auth state and removes tokens from secure storage.
+  /// Does NOT contact the server – call [logout] for a full server+client
+  /// invalidation (e.g. when the user explicitly logs out).
+  static Future<void> clearSession() async {
+    _authToken = '';
+    _userId = '';
+    _avatarCache.clear();
+    _cachedMe = null;
+    _lastMeFetch = null;
+    _lastAvatarFetch = null;
+    _messagesRateLimitedUntil = null;
+    await _secure.delete(key: _keyAuthToken);
+    await _secure.delete(key: _keyUserId);
+    // Belt-and-suspenders: remove any legacy plain-prefs copies.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('matrix_auth_token');
+    await prefs.remove('matrix_user_id');
+  }
+
+  /// Calls the Rocket.Chat server-side logout endpoint, then clears all local
+  /// auth state.  Best-effort: a network failure does not prevent local cleanup.
+  static Future<void> logout() async {
+    // Attempt server-side session invalidation first so the token cannot be
+    // replayed even if it was captured from a log or network trace.
+    if (_authToken.isNotEmpty && _userId.isNotEmpty) {
+      try {
+        await http
+            .post(
+              Uri.parse('$_baseUrl/api/v1/logout'),
+              headers: _headers,
+            )
+            .timeout(const Duration(seconds: 10));
+      } catch (e) {
+        // Network failure is non-fatal; local cleanup still proceeds below.
+        // Log at debug level so developers can see transient connectivity issues.
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ MatrixService.logout: server-side invalidation failed: $e');
+          return true;
+        }());
+      }
+    }
+    await clearSession();
+  }
+
   static Future<bool> restoreSession() async {
     var token = await _secure.read(key: _keyAuthToken);
     var userId = await _secure.read(key: _keyUserId);
@@ -74,6 +119,26 @@ class MatrixService {
 
   static Uri _abs(String url) {
     return Uri.parse(url.startsWith('http') ? url : '$_baseUrl$url');
+  }
+
+  /// Returns a copy of [uri] with auth-bearing query parameters removed,
+  /// safe to include in log messages.
+  static Uri _safeUri(Uri uri) {
+    const sensitiveParams = {'rc_uid', 'rc_token'};
+    if (!uri.queryParameters.keys.any(sensitiveParams.contains)) return uri;
+    final sanitized = Map<String, String>.from(uri.queryParameters)
+      ..removeWhere((k, _) => sensitiveParams.contains(k));
+    if (sanitized.isEmpty) {
+      // Rebuild URI without any query string.
+      return Uri(
+        scheme: uri.scheme,
+        userInfo: uri.userInfo,
+        host: uri.host,
+        port: uri.hasPort ? uri.port : null,
+        path: uri.path,
+      );
+    }
+    return uri.replace(queryParameters: sanitized);
   }
 
   static Map<String, String> get _headers => {
@@ -116,7 +181,7 @@ class MatrixService {
       try {
         resp = await http.get(current, headers: _authHeaders).timeout(timeout);
       } catch (e) {
-        print('❌ fetchAuthedBytes error for $current: $e');
+        print('❌ fetchAuthedBytes error for ${_safeUri(current)}: $e');
         return null;
       }
 
@@ -129,7 +194,7 @@ class MatrixService {
           status == 308) {
         final loc = resp.headers['location'];
         if (loc == null || loc.isEmpty) {
-          print('❌ fetchAuthedBytes redirect without location for $current');
+          print('❌ fetchAuthedBytes redirect without location for ${_safeUri(current)}');
           return null;
         }
         current = Uri.parse(loc.startsWith('http') ? loc : '$_baseUrl$loc');
@@ -139,7 +204,7 @@ class MatrixService {
       if (status != 200) {
         final ct = resp.headers['content-type'];
         print(
-            '❌ fetchAuthedBytes non-200=$status ct=$ct url=$current bytes=${resp.bodyBytes.length}');
+            '❌ fetchAuthedBytes non-200=$status ct=$ct url=${_safeUri(current)} bytes=${resp.bodyBytes.length}');
         final preview = resp.bodyBytes.isNotEmpty
             ? utf8.decode(resp.bodyBytes.take(250).toList(),
             allowMalformed: true)
@@ -151,14 +216,14 @@ class MatrixService {
       }
 
       if (resp.bodyBytes.isEmpty) {
-        print('❌ fetchAuthedBytes empty body for $current');
+        print('❌ fetchAuthedBytes empty body for ${_safeUri(current)}');
         return null;
       }
 
       return resp.bodyBytes;
     }
 
-    print('❌ fetchAuthedBytes exceeded maxRedirects=$maxRedirects for $url');
+    print('❌ fetchAuthedBytes exceeded maxRedirects=$maxRedirects for ${_safeUri(_abs(url))}');
     return null;
   }
 
@@ -167,9 +232,9 @@ class MatrixService {
     try {
       final resp = await http.get(uri, headers: _authHeaders);
       print(
-          '🔎 probeUrl $uri -> ${resp.statusCode} ct=${resp.headers['content-type']} bytes=${resp.bodyBytes.length}');
+          '🔎 probeUrl ${_safeUri(uri)} -> ${resp.statusCode} ct=${resp.headers['content-type']} bytes=${resp.bodyBytes.length}');
     } catch (e) {
-      print('❌ probeUrl error for $uri: $e');
+      print('❌ probeUrl error for ${_safeUri(uri)}: $e');
     }
   }
 
@@ -323,15 +388,19 @@ class MatrixService {
 
       final subs = (jsonDecode(resp.body)['update']) as List<dynamic>;
 
-      // ✅ DEBUG: Inspect subscriptions payload (room type + unread counters)
-      // This helps confirm whether channels/discussions are returning unread values.
-      for (final s in subs) {
-        print(
-          'SUB rid=${s['rid']} t=${s['t']} fname=${s['fname']} '
-              'unread=${s['unread']} alert=${s['alert']} open=${s['open']} '
-              'ls=${s['ls']}',
-        );
-      }
+      // Debug-only: subscription payload inspection (room type + unread counters).
+      // Guarded so it is compiled out of release builds.
+      assert(() {
+        for (final s in subs) {
+          // ignore: avoid_print
+          print(
+            'SUB rid=${s['rid']} t=${s['t']} fname=${s['fname']} '
+                'unread=${s['unread']} alert=${s['alert']} open=${s['open']} '
+                'ls=${s['ls']}',
+          );
+        }
+        return true;
+      }());
 
       return subs.map((s) {
         final rawUnread = s['unread'];
@@ -507,8 +576,6 @@ class MatrixService {
         String? message,
       }) async {
     final uri = Uri.parse('$_baseUrl/api/v1/rooms.media/$roomId');
-    print('Uploading file: $filePath to room: $roomId');
-    print('Full URI: $uri');
 
     final req = http.MultipartRequest('POST', uri)..headers.addAll(_authHeaders);
 
@@ -530,7 +597,11 @@ class MatrixService {
     try {
       final res = await req.send();
       final body = await res.stream.bytesToString();
-      print('⬅️ rooms.media ← ${res.statusCode} $body');
+      assert(() {
+        // ignore: avoid_print
+        print('⬅️ rooms.media ← ${res.statusCode}');
+        return true;
+      }());
 
       if (res.statusCode == 429) {
         print('⚠️ rooms.media rate limited');
@@ -563,8 +634,6 @@ class MatrixService {
         String? message,
       }) async {
     final uri = Uri.parse('$_baseUrl/api/v1/rooms.media/$roomId');
-    print('Uploading bytes: ${bytes.length} for $filename to room: $roomId');
-    print('Full URI: $uri');
 
     final req = http.MultipartRequest('POST', uri)..headers.addAll(_authHeaders);
 
@@ -586,7 +655,11 @@ class MatrixService {
     try {
       final res = await req.send();
       final body = await res.stream.bytesToString();
-      print('⬅️ rooms.media(bytes) ← ${res.statusCode} $body');
+      assert(() {
+        // ignore: avoid_print
+        print('⬅️ rooms.media(bytes) ← ${res.statusCode}');
+        return true;
+      }());
 
       if (res.statusCode == 429) {
         print('⚠️ rooms.media(bytes) rate limited');
@@ -664,7 +737,11 @@ class MatrixService {
         return false;
       }
 
-      print('⬅️ chat.postMessage(file) ← ${resp.statusCode} ${resp.body}');
+      assert(() {
+        // ignore: avoid_print
+        print('⬅️ chat.postMessage(file) ← ${resp.statusCode}');
+        return true;
+      }());
       if (resp.statusCode != 200) return false;
 
       final d = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -893,7 +970,11 @@ class MatrixService {
     try {
       final res = await req.send();
       final body = await res.stream.bytesToString();
-      print('⬅️ setAvatar ← ${res.statusCode} $body');
+      assert(() {
+        // ignore: avoid_print
+        print('⬅️ setAvatar ← ${res.statusCode}');
+        return true;
+      }());
 
       if (res.statusCode == 429) {
         print('⚠️ setAvatar rate limited');

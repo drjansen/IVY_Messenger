@@ -73,8 +73,6 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _loadUserProfile() async {
     try {
       final me = await MatrixService.getMe();
-      // ignore: avoid_print
-      print('Avatar URL: ${me['avatarUrl']}');
       setState(() {
         userName = (me['name'] ?? me['username']) as String?;
         avatarUrl = addCacheBuster(me['avatarUrl'] as String?);
@@ -95,9 +93,12 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  void _onLogout() {
+  Future<void> _onLogout() async {
     debugPrint('UserBar: Logout triggered in MainScreen');
-    SessionManager.username = null;
+    // Server-side session invalidation + in-memory/storage clear.
+    await MatrixService.logout();
+    await SessionManager.clearSession();
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
           (route) => false,

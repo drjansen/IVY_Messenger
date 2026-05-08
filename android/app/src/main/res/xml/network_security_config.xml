@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network Security Config – ICS Messenger App
+
+  Policy:
+  - Cleartext (plain HTTP) is explicitly prohibited for all destinations.
+  - The app trusts the system CA store only; no additional user-installed CAs
+    are trusted, reducing the risk of interception by corporate proxies or
+    user-installed root certificates.
+  - Certificate pinning (OPN-3) is NOT yet implemented here because it
+    requires coordination with the server team to obtain leaf/intermediate
+    public key hashes and a rotation plan.  When ready, add a
+    <pin-set> block inside a <domain-config> for each backend domain.
+-->
+<network-security-config>
+    <!-- Global default: no cleartext traffic permitted anywhere;
+         trust system CAs only (no user-installed CAs). -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

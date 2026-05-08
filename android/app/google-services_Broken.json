@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "ics-messenger-diosa",
+  "private_key_id": "8ab959a5b4b3ff04b3d99c57b87d905dc0b5f517",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQC5vhyg++cvWMqn\nBJ63O3Z3pWg13RkGQ7xX5nvYNS8p4DvGWzv68G1TZAdYEGmobXCPKJVuwLnCQ+WW\ntA4zhZzOfPR5LOBgF7HWEkHgYUps53LFXnJE/wim8MvHSXECN62EYbWeglKdb02/\ntoKKzF1/irvyuURHe5/3jf29/40ck2X7MvZYYOm2fszr716Z55vnsRu1SWEqnKqF\nWXTt2kCHkl0Sm2LtVkwMSz8UaKkUYGXnCJxWG3XAlUth1/FVjmA7VKVO9GZpIjOC\nSmQIzueBkCQCs1YAIyA6k1aWANHZGaSmbAQ0gmpV6cFqlp4l2cw2zYO6mdWOOCmS\njEz3Zs05AgMBAAECggEAK9zp3Nhv+V3iCXwNUR8BNHMCv4mVccXIMgfTYjT5DM4P\nv6Fm8jUZ1DIQi+rgUK57gMsoMs3fcDFhg+vEWMVqSNb4Uq9W00p1LCUGmorPLRWh\nJFvP51xEukuuC8NbpRbp6pO6dJK5GMWimi3q+QUW5VopVUIMDkdy+N52uAoj1EXQ\n3N1ExNdwY7gsnFqwJNwOz6i+qlOjri/zGGxxBCg0Po+1V0mOtlo0si6InrEjDq6Z\ny+BcGw0OMgm1rIn/lMAcofI9cHyCADI+JP7J/xDqrIgddg3yhUCRwgGdErYbhFXZ\nQFej7l4on3wLuzLoLcJSPy4wPfsDLQ9JJI1kUUfYaQKBgQD3/rdkvzfY9o+6N19+\nydY5ZN9UTSzUfU2r3aS/UjsGUYV2IsATw31QK5leBY5z3Uy+sZoRuMw6nH5vRyRo\n4Dw0wwdBTafDMTgfOzLa+2ljPF5BeraWVlfj8mnH+7cWOj38k/j46fXbVDSY8R4b\nodkTbMQs0WLQfmpq3v4Nq7F3PQKBgQC/vPqUBQ4mKOMEcCSDepzZY5rynpGDJNMt\n24dlULQFdPL5sdqIJCJLMdV8w9NSlkkMbLwYX8YGoR4Z8IKV6zDADwLoUH/h5/3S\n4ulFDcdHjoAuzMaCQk1l6BW5CsPnCKyi/8BYTHVEzOnhL6UhuvPk3xpP4u7uO9IK\n06MCNMmtrQKBgQCSqnL9w1UdHJzeDbeNfYMTiIPIEKhttvmDpl6zw8cisn3S4zRj\nu97V1iMrBvA7t+qWcOTkjD1EgJ8J4rI20D7rGVimF24bM3W0isdF2SB3zxETeqaX\nfNMX/Zrv6f9axvE3+q9pTrzXjRJaTWd4Ah0mrtHKi777/XekYuMvZJZdJQKBgQCG\nueFQ1OSGR8CMw8fEYwmHbwfXZzhT8DI7TMAsnrKACxcYALLPaqR2NcQO8QKyS0t0\n4Yqhjdp1mgyuqWL4uNP+gA3I85eIQx0Fa9ABZ5cZXrYPLHBn4vLDonpxFXFmC6BS\nwGaFJORZvaqxQmtD8juiHGo+q/S7jWkflmo6CKGV2QKBgQDCwUREQunezqhM/mLf\nGH94FxquRHlYSmuHEBUHJE/b0kQ++aHAn121ADtPegOQnLb/3mTgIRGy2LCbj6sy\nYdDpF0354ahy6//CzAJyvGRcC0sKqOasTpk6Fou7sxkPYXfXiR0QmeW5UQln6EbJ\nMI6IzjuYdxYOrQRC3mU1tCL9fw==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@ics-messenger-diosa.iam.gserviceaccount.com",
+  "client_id": "113811892030038036181",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40ics-messenger-diosa.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

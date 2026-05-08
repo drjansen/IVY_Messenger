@@ -1,0 +1,976 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:path/path.dart' show basename;
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+class MatrixService {
+  static const _baseUrl = 'https://app.icsportals.org';
+  static late String _authToken;
+  static late String _userId;
+
+  static String get rocketchatAuthToken => _authToken;
+  static String get rocketchatUserId => _userId;
+  static String get authToken => _authToken;
+  static String get userId => _userId;
+
+  static final Map<String, String?> _avatarCache = {};
+  static DateTime? _lastAvatarFetch;
+  static const _avatarFetchCooldown = Duration(milliseconds: 500);
+  static Map<String, dynamic>? _cachedMe;
+  static DateTime? _lastMeFetch;
+  static const _meCacheDuration = Duration(seconds: 30);
+
+  // --- Rate limit state (messages) ---
+  static DateTime? _messagesRateLimitedUntil;
+
+  static Future<void> persistSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('matrix_auth_token', _authToken);
+    await prefs.setString('matrix_user_id', _userId);
+  }
+
+  static Future<bool> restoreSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('matrix_auth_token');
+    final userId = prefs.getString('matrix_user_id');
+    if (token != null && userId != null) {
+      _authToken = token;
+      _userId = userId;
+      return true;
+    }
+    return false;
+  }
+
+  static Uri _abs(String url) {
+    return Uri.parse(url.startsWith('http') ? url : '$_baseUrl$url');
+  }
+
+  static Map<String, String> get _headers => {
+    'X-Auth-Token': _authToken,
+    'X-User-Id': _userId,
+    'Content-Type': 'application/json',
+  };
+
+  static Map<String, String> get _authHeaders => {
+    'X-Auth-Token': _authToken,
+    'X-User-Id': _userId,
+  };
+
+  /// Adds rc_uid/rc_token query parameters to a URL (relative or absolute),
+  /// preserving any existing query parameters.
+  static Uri withAuthQuery(String url) {
+    final uri = _abs(url);
+
+    // If already tokenized, do not override.
+    if (uri.queryParameters.containsKey('rc_uid') ||
+        uri.queryParameters.containsKey('rc_token')) {
+      return uri;
+    }
+
+    final qp = Map<String, String>.from(uri.queryParameters);
+    qp['rc_uid'] = _userId;
+    qp['rc_token'] = _authToken;
+    return uri.replace(queryParameters: qp);
+  }
+
+  static Future<Uint8List?> fetchAuthedBytes(
+      String url, {
+        int maxRedirects = 5,
+        Duration timeout = const Duration(seconds: 30),
+      }) async {
+    Uri current = _abs(url);
+
+    for (int i = 0; i <= maxRedirects; i++) {
+      http.Response resp;
+      try {
+        resp = await http.get(current, headers: _authHeaders).timeout(timeout);
+      } catch (e) {
+        print('❌ fetchAuthedBytes error for $current: $e');
+        return null;
+      }
+
+      final status = resp.statusCode;
+
+      if (status == 301 ||
+          status == 302 ||
+          status == 303 ||
+          status == 307 ||
+          status == 308) {
+        final loc = resp.headers['location'];
+        if (loc == null || loc.isEmpty) {
+          print('❌ fetchAuthedBytes redirect without location for $current');
+          return null;
+        }
+        current = Uri.parse(loc.startsWith('http') ? loc : '$_baseUrl$loc');
+        continue;
+      }
+
+      if (status != 200) {
+        final ct = resp.headers['content-type'];
+        print(
+            '❌ fetchAuthedBytes non-200=$status ct=$ct url=$current bytes=${resp.bodyBytes.length}');
+        final preview = resp.bodyBytes.isNotEmpty
+            ? utf8.decode(resp.bodyBytes.take(250).toList(),
+            allowMalformed: true)
+            : '';
+        if (preview.isNotEmpty) {
+          print('❌ fetchAuthedBytes body preview: $preview');
+        }
+        return null;
+      }
+
+      if (resp.bodyBytes.isEmpty) {
+        print('❌ fetchAuthedBytes empty body for $current');
+        return null;
+      }
+
+      return resp.bodyBytes;
+    }
+
+    print('❌ fetchAuthedBytes exceeded maxRedirects=$maxRedirects for $url');
+    return null;
+  }
+
+  static Future<void> probeUrl(String url) async {
+    final uri = _abs(url);
+    try {
+      final resp = await http.get(uri, headers: _authHeaders);
+      print(
+          '🔎 probeUrl $uri -> ${resp.statusCode} ct=${resp.headers['content-type']} bytes=${resp.bodyBytes.length}');
+    } catch (e) {
+      print('❌ probeUrl error for $uri: $e');
+    }
+  }
+
+  static String getMimeType(String filePathOrName) {
+    final ext = filePathOrName.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+      case 'jfif':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  static bool _isLikelyImageByName(String filename) {
+    final name = filename.toLowerCase();
+    return name.endsWith('.png') ||
+        name.endsWith('.jpg') ||
+        name.endsWith('.jpeg') ||
+        name.endsWith('.gif') ||
+        name.endsWith('.webp') ||
+        name.endsWith('.jfif');
+  }
+
+  static int? _parseRetryAfterSecondsFromBody(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map) {
+        final err = decoded['error']?.toString() ?? '';
+        final m = RegExp(r'wait\s+(\d+)\s+seconds', caseSensitive: false)
+            .firstMatch(err);
+        if (m != null) return int.tryParse(m.group(1) ?? '');
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<String?> _getUserAvatar(String userId) async {
+    if (_avatarCache.containsKey(userId)) return _avatarCache[userId];
+
+    if (_lastAvatarFetch != null &&
+        DateTime.now().difference(_lastAvatarFetch!) < _avatarFetchCooldown) {
+      final defaultAvatar = withAuthQuery('/avatar/$userId').toString();
+      _avatarCache[userId] = defaultAvatar;
+      return defaultAvatar;
+    }
+    _lastAvatarFetch = DateTime.now();
+
+    if (userId == _userId) {
+      final me = await getMe();
+      _avatarCache[userId] = me['avatarUrl'] as String?;
+      return _avatarCache[userId];
+    }
+
+    try {
+      final resp = await http.get(
+        Uri.parse('$_baseUrl/api/v1/users.info?userId=$userId'),
+        headers: _headers,
+      );
+
+      if (resp.statusCode == 429) {
+        print('⚠️ _getUserAvatar rate limited for $userId');
+        final defaultAvatar = withAuthQuery('/avatar/$userId').toString();
+        _avatarCache[userId] = defaultAvatar;
+        return defaultAvatar;
+      }
+
+      if (resp.statusCode != 200) {
+        _avatarCache[userId] = null;
+        return null;
+      }
+
+      final dec = jsonDecode(resp.body) as Map<String, dynamic>;
+      final rawUser =
+      (dec['user'] ?? (dec['data'] as Map?)?['user']) as Map<String, dynamic>?;
+      if (rawUser == null) {
+        _avatarCache[userId] = null;
+        return null;
+      }
+
+      final username = rawUser['username'] as String? ?? userId;
+      var avatar = rawUser['avatarUrl'] as String? ??
+          rawUser['avatar'] as String? ??
+          '/avatar/$username';
+      if (!avatar.startsWith('http')) avatar = '$_baseUrl$avatar';
+
+      final etag = rawUser['avatarETag'] as String?;
+      if (etag != null && etag.isNotEmpty) {
+        avatar = avatar.contains('?') ? '$avatar&etag=$etag' : '$avatar?etag=$etag';
+      }
+
+      final authed = withAuthQuery(avatar).toString();
+      _avatarCache[userId] = authed;
+      return authed;
+    } catch (e) {
+      print('❌ _getUserAvatar error for $userId: $e');
+      final defaultAvatar = withAuthQuery('/avatar/$userId').toString();
+      _avatarCache[userId] = defaultAvatar;
+      return defaultAvatar;
+    }
+  }
+
+  static Future<bool> login(String username, String password) async {
+    final resp = await http.post(
+      Uri.parse('$_baseUrl/api/v1/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'user': username, 'password': password}),
+    );
+    if (resp.statusCode != 200) {
+      print('❌ Login failed: ${resp.body}');
+      return false;
+    }
+    final data = (jsonDecode(resp.body)['data']) as Map<String, dynamic>;
+    _authToken = data['authToken'] as String;
+    _userId = data['userId'] as String;
+
+    _avatarCache.clear();
+    _cachedMe = null;
+    _lastMeFetch = null;
+    _messagesRateLimitedUntil = null;
+
+    await persistSession();
+    print('🔒 [AUTH TOKEN] $_authToken');
+    print('👤 [USER ID] $_userId');
+    return true;
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchJoinedRoomIds(String _) async {
+    try {
+      final resp = await http.get(
+        Uri.parse('$_baseUrl/api/v1/subscriptions.get'),
+        headers: _headers,
+      );
+
+      if (resp.statusCode == 429) {
+        print('⚠️ fetchJoinedRoomIds rate limited: ${resp.body}');
+        return [];
+      }
+
+      if (resp.statusCode != 200) {
+        print('❌ fetchRooms failed: ${resp.body}');
+        return [];
+      }
+
+      final subs = (jsonDecode(resp.body)['update']) as List<dynamic>;
+
+      // ✅ DEBUG: Inspect subscriptions payload (room type + unread counters)
+      // This helps confirm whether channels/discussions are returning unread values.
+      for (final s in subs) {
+        print(
+          'SUB rid=${s['rid']} t=${s['t']} fname=${s['fname']} '
+              'unread=${s['unread']} alert=${s['alert']} open=${s['open']} '
+              'ls=${s['ls']}',
+        );
+      }
+
+      return subs.map((s) {
+        final rawUnread = s['unread'];
+        final int unreadCount =
+        rawUnread != null ? int.tryParse(rawUnread.toString()) ?? 0 : 0;
+
+        String? avatarUrl;
+        final avatarPath = s['avatar'] as String?;
+        final avatarETag = s['avatarETag'] as String?;
+        if (avatarPath != null && avatarPath.isNotEmpty) {
+          avatarUrl = avatarPath.startsWith('http')
+              ? avatarPath
+              : '$_baseUrl$avatarPath';
+          if (avatarETag != null && avatarETag.isNotEmpty) {
+            avatarUrl = avatarUrl.contains('?')
+                ? '$avatarUrl&etag=$avatarETag'
+                : '$avatarUrl?etag=$avatarETag';
+          }
+          avatarUrl = withAuthQuery(avatarUrl).toString();
+        }
+
+        return {
+          'id': s['rid'] as String,
+          'name': s['fname'] as String? ?? '',
+          'unread': unreadCount,
+          'type': s['t'] as String,
+          'muted': s['muted'] as bool? ?? false,
+          'alert': s['alert'] as bool? ?? false, // ✅ ADDED: per-room activity indicator
+          'avatarUrl': avatarUrl,
+        };
+      }).toList();
+    } catch (e) {
+      print('❌ fetchJoinedRoomIds error: $e');
+      return [];
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchMessages(
+      String roomId, String roomType) async {
+    if (_messagesRateLimitedUntil != null &&
+        DateTime.now().isBefore(_messagesRateLimitedUntil!)) {
+      print(
+          '⏳ fetchMessages skipped until $_messagesRateLimitedUntil (rate limited)');
+      return [];
+    }
+
+    final endpoint = roomType == 'd'
+        ? 'im.history'
+        : roomType == 'c'
+        ? 'channels.messages'
+        : 'groups.messages';
+
+    try {
+      final resp = await http.get(
+        Uri.parse('$_baseUrl/api/v1/$endpoint?roomId=$roomId&count=50'),
+        headers: _headers,
+      );
+
+      if (resp.statusCode == 429) {
+        print('⚠️ fetchMessages rate limited: ${resp.body}');
+        final waitSeconds = _parseRetryAfterSecondsFromBody(resp.body);
+        final backoff = Duration(seconds: (waitSeconds ?? 30) + 1);
+        _messagesRateLimitedUntil = DateTime.now().add(backoff);
+        print(
+            '⏳ fetchMessages cooldown set for ${backoff.inSeconds}s (until $_messagesRateLimitedUntil)');
+        return [];
+      }
+
+      _messagesRateLimitedUntil = null;
+
+      if (resp.statusCode != 200) {
+        print('❌ fetchMessages failed: ${resp.body}');
+        return [];
+      }
+
+      final list = (jsonDecode(resp.body)['messages']) as List<dynamic>;
+      final results = <Map<String, dynamic>>[];
+
+      for (final raw in list) {
+        final m = raw as Map<String, dynamic>;
+        final entry = <String, dynamic>{
+          'senderId': m['u']?['_id']?.toString() ?? '',
+          'event_id': m['_id']?.toString() ?? '',
+          'sender': m['u']?['username']?.toString().toLowerCase() ?? '',
+          'body': m['msg']?.toString() ?? '',
+          'timestamp': m['ts'] != null
+              ? DateTime.parse(m['ts'].toString()).millisecondsSinceEpoch
+              : 0,
+        };
+
+        if (m['animatedEmoji'] != null &&
+            m['animatedEmoji'].toString().isNotEmpty) {
+          entry['animatedEmoji'] = m['animatedEmoji'].toString();
+        } else if (m['attachments'] is List) {
+          final atts = m['attachments'] as List<dynamic>;
+          if (atts.isNotEmpty && atts[0]['animatedEmoji'] != null) {
+            entry['animatedEmoji'] = atts[0]['animatedEmoji'].toString();
+          }
+        }
+
+        final file = m['file'] as Map<String, dynamic>?;
+        if (file != null && file['url'] != null) {
+          entry['imageUrl'] = withAuthQuery(file['url'].toString()).toString();
+        } else if (m['attachments'] is List) {
+          final atts = m['attachments'] as List<dynamic>;
+          if (atts.isNotEmpty) {
+            final img = atts[0]['image_url'] as String? ??
+                atts[0]['title_link'] as String?;
+            if (img != null) {
+              entry['imageUrl'] = withAuthQuery(img).toString();
+            }
+          }
+        }
+
+        if (m['tmid'] != null) {
+          entry['replyToEventId'] = m['tmid'] as String;
+        }
+
+        final uid = entry['senderId'] as String;
+        entry['avatarUrl'] = await _getUserAvatar(uid);
+
+        results.add(entry);
+      }
+
+      return results.reversed.toList();
+    } catch (e) {
+      print('❌ fetchMessages error: $e');
+      return [];
+    }
+  }
+
+  static Future<bool> sendMessage(
+      String roomId,
+      String text, {
+        String? threadId,
+        String? animatedEmoji,
+      }) async {
+    final payload = <String, dynamic>{
+      'roomId': roomId,
+      'text': text,
+      if (threadId != null) 'tmid': threadId,
+      if (animatedEmoji != null && animatedEmoji.isNotEmpty)
+        'animatedEmoji': animatedEmoji,
+    };
+
+    try {
+      final resp = await http.post(
+        Uri.parse('$_baseUrl/api/v1/chat.postMessage'),
+        headers: _headers,
+        body: jsonEncode(payload),
+      );
+
+      if (resp.statusCode == 429) {
+        print('⚠️ sendMessage rate limited: ${resp.body}');
+        return false;
+      }
+
+      if (resp.statusCode != 200) {
+        print('❌ sendMessage failed: ${resp.body}');
+        return false;
+      }
+      final d = jsonDecode(resp.body) as Map<String, dynamic>;
+      return d['success'] == true;
+    } catch (e) {
+      print('❌ sendMessage error: $e');
+      return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> _uploadToRoomsMedia(
+      String roomId,
+      String filePath, {
+        String? message,
+      }) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/rooms.media/$roomId');
+    print('Uploading file: $filePath to room: $roomId');
+    print('Full URI: $uri');
+
+    final req = http.MultipartRequest('POST', uri)..headers.addAll(_authHeaders);
+
+    req.fields['roomId'] = roomId;
+
+    if (message != null && message.trim().isNotEmpty) {
+      req.fields['msg'] = message.trim();
+    }
+
+    req.files.add(
+      await http.MultipartFile.fromPath(
+        'file',
+        filePath,
+        filename: basename(filePath),
+        contentType: MediaType.parse(getMimeType(filePath)),
+      ),
+    );
+
+    try {
+      final res = await req.send();
+      final body = await res.stream.bytesToString();
+      print('⬅️ rooms.media ← ${res.statusCode} $body');
+
+      if (res.statusCode == 429) {
+        print('⚠️ rooms.media rate limited');
+        return null;
+      }
+
+      if (res.statusCode != 200) return null;
+
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) return null;
+      if (decoded['success'] != true) return null;
+
+      final file = decoded['file'];
+      if (file is! Map<String, dynamic>) return null;
+
+      final url = file['url']?.toString();
+      if (url == null || url.isEmpty) return null;
+
+      return file;
+    } catch (e) {
+      print('❌ rooms.media upload error: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> _uploadToRoomsMediaBytes(
+      String roomId,
+      Uint8List bytes,
+      String filename, {
+        String? message,
+      }) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/rooms.media/$roomId');
+    print('Uploading bytes: ${bytes.length} for $filename to room: $roomId');
+    print('Full URI: $uri');
+
+    final req = http.MultipartRequest('POST', uri)..headers.addAll(_authHeaders);
+
+    req.fields['roomId'] = roomId;
+
+    if (message != null && message.trim().isNotEmpty) {
+      req.fields['msg'] = message.trim();
+    }
+
+    req.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: MediaType.parse(getMimeType(filename)),
+      ),
+    );
+
+    try {
+      final res = await req.send();
+      final body = await res.stream.bytesToString();
+      print('⬅️ rooms.media(bytes) ← ${res.statusCode} $body');
+
+      if (res.statusCode == 429) {
+        print('⚠️ rooms.media(bytes) rate limited');
+        return null;
+      }
+
+      if (res.statusCode != 200) return null;
+
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) return null;
+      if (decoded['success'] != true) return null;
+
+      final file = decoded['file'];
+      if (file is! Map<String, dynamic>) return null;
+
+      final url = file['url']?.toString();
+      if (url == null || url.isEmpty) return null;
+
+      return file;
+    } catch (e) {
+      print('❌ rooms.media(bytes) upload error: $e');
+      return null;
+    }
+  }
+
+  /// IMPORTANT for grouping in the app UI:
+  /// - When the upload is an image and the user didn't provide a caption,
+  ///   we send an empty text (so `msg` is empty).
+  static Future<bool> _postFileMessage({
+    required String roomId,
+    required Map<String, dynamic> file,
+    String? message,
+  }) async {
+    final relativeUrl = file['url']?.toString();
+    if (relativeUrl == null || relativeUrl.isEmpty) return false;
+
+    final authedUrl = withAuthQuery(relativeUrl).toString();
+    final filename =
+        file['name']?.toString() ?? basename(Uri.parse(authedUrl).path);
+
+    final caption = message?.trim();
+    final bool hasCaption = caption != null && caption.isNotEmpty;
+    final bool isImage = _isLikelyImageByName(filename);
+
+    final String textToSend;
+    if (hasCaption) {
+      textToSend = caption!;
+    } else if (isImage) {
+      textToSend = '';
+    } else {
+      textToSend = filename;
+    }
+
+    final payload = <String, dynamic>{
+      'roomId': roomId,
+      'text': textToSend,
+      'attachments': [
+        {
+          'title': filename,
+          'title_link': authedUrl,
+          if (isImage) 'image_url': authedUrl,
+        }
+      ],
+    };
+
+    try {
+      final resp = await http.post(
+        Uri.parse('$_baseUrl/api/v1/chat.postMessage'),
+        headers: _headers,
+        body: jsonEncode(payload),
+      );
+
+      if (resp.statusCode == 429) {
+        print('⚠️ chat.postMessage(file) rate limited: ${resp.body}');
+        return false;
+      }
+
+      print('⬅️ chat.postMessage(file) ← ${resp.statusCode} ${resp.body}');
+      if (resp.statusCode != 200) return false;
+
+      final d = jsonDecode(resp.body) as Map<String, dynamic>;
+      return d['success'] == true;
+    } catch (e) {
+      print('❌ chat.postMessage(file) error: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> uploadFile(
+      String roomId,
+      String filePath, {
+        String? message,
+      }) async {
+    try {
+      final file = await _uploadToRoomsMedia(roomId, filePath, message: message);
+      if (file == null) return false;
+
+      final ok =
+      await _postFileMessage(roomId: roomId, file: file, message: message);
+      if (!ok) {
+        print('❌ uploadFile: upload succeeded but posting message failed.');
+      }
+      return ok;
+    } catch (e) {
+      print('❌ uploadFile error: $e');
+      return false;
+    }
+  }
+
+  /// New: upload when you only have bytes (reliable for MediaStore/camera images).
+  static Future<bool> uploadBytes(
+      String roomId,
+      Uint8List bytes,
+      String filename, {
+        String? message,
+      }) async {
+    try {
+      final file = await _uploadToRoomsMediaBytes(
+        roomId,
+        bytes,
+        filename,
+        message: message,
+      );
+      if (file == null) return false;
+
+      final ok =
+      await _postFileMessage(roomId: roomId, file: file, message: message);
+      if (!ok) {
+        print('❌ uploadBytes: upload succeeded but posting message failed.');
+      }
+      return ok;
+    } catch (e) {
+      print('❌ uploadBytes error: $e');
+      return false;
+    }
+  }
+
+  static Future<void> registerPushToken(String _) async {
+    if (kIsWeb) return;
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null) return;
+    print('🔑 [FCM Token] $token');
+    print('🔒 [AUTH TOKEN] $_authToken');
+
+    try {
+      await http.post(
+        Uri.parse('$_baseUrl/api/v1/push.token'),
+        headers: _headers,
+        body: jsonEncode({
+          'type': 'gcm',
+          'value': token,
+          'appName': 'ICS Messenger',
+        }),
+      );
+    } catch (e) {
+      print('❌ registerPushToken error: $e');
+    }
+  }
+
+  static Future<bool> markRoomAsRead(String roomId) async {
+    try {
+      final resp = await http.post(
+        Uri.parse('$_baseUrl/api/v1/subscriptions.read'),
+        headers: _headers,
+        body: jsonEncode({'rid': roomId}),
+      );
+
+      if (resp.statusCode == 429) {
+        print('⚠️ markRoomAsRead rate limited');
+        return false;
+      }
+
+      if (resp.statusCode != 200) {
+        print('❌ markRoomAsRead failed: ${resp.body}');
+        return false;
+      }
+      final d = jsonDecode(resp.body) as Map<String, dynamic>;
+      return d['success'] == true;
+    } catch (e) {
+      print('❌ markRoomAsRead error: $e');
+      return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>> getMe() async {
+    if (_cachedMe != null &&
+        _lastMeFetch != null &&
+        DateTime.now().difference(_lastMeFetch!) < _meCacheDuration) {
+      return _cachedMe!;
+    }
+
+    Map<String, dynamic>? userMap;
+
+    try {
+      final resp = await http.get(
+        Uri.parse('$_baseUrl/api/v1/me'),
+        headers: _headers,
+      );
+
+      if (resp.statusCode == 429) {
+        print('⚠️ getMe rate limited');
+        if (_cachedMe != null) return _cachedMe!;
+        return {
+          'username': _userId,
+          'name': '',
+          'avatarUrl': withAuthQuery('/avatar/$_userId').toString(),
+        };
+      }
+
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is Map<String, dynamic>) {
+          if (decoded.containsKey('username') || decoded.containsKey('_id')) {
+            userMap = decoded;
+          } else {
+            final data = decoded['data'] as Map<String, dynamic>?;
+            if (data != null) {
+              final u = data['user'] ?? data['me'];
+              if (u is Map<String, dynamic>) userMap = Map.from(u);
+            }
+            if (userMap == null) {
+              final u = decoded['user'] ?? decoded['me'];
+              if (u is Map<String, dynamic>) userMap = Map.from(u);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ getMe /me endpoint error: $e');
+    }
+
+    if (userMap == null) {
+      try {
+        final info = await http.get(
+          Uri.parse('$_baseUrl/api/v1/users.info?userId=$_userId'),
+          headers: _headers,
+        );
+
+        if (info.statusCode == 429) {
+          print('⚠️ getMe users.info rate limited');
+          if (_cachedMe != null) return _cachedMe!;
+          return {
+            'username': _userId,
+            'name': '',
+            'avatarUrl': withAuthQuery('/avatar/$_userId').toString(),
+          };
+        }
+
+        if (info.statusCode == 200) {
+          final dec = jsonDecode(info.body);
+          final direct = dec['user'];
+          final nested = (dec['data'] as Map?)?['user'];
+          final raw = direct is Map<String, dynamic> ? direct : nested;
+          if (raw is Map<String, dynamic>) userMap = Map.from(raw);
+        }
+      } catch (e) {
+        print('❌ getMe users.info fallback error: $e');
+      }
+    }
+
+    if (userMap == null) {
+      print('❌ getMe: could not retrieve user');
+      return {
+        'username': _userId,
+        'name': '',
+        'avatarUrl': withAuthQuery('/avatar/$_userId').toString(),
+      };
+    }
+
+    final username = userMap['username'] as String? ?? '';
+    final name = userMap['name'] as String? ?? username;
+    var avatar = userMap['avatarUrl'] as String? ??
+        (userMap['avatar'] as String?) ??
+        '/avatar/$username';
+    if (!avatar.startsWith('http')) avatar = '$_baseUrl$avatar';
+    final etag = userMap['avatarETag'] as String?;
+    if (etag != null && etag.isNotEmpty) {
+      avatar = avatar.contains('?') ? '$avatar&etag=$etag' : '$avatar?etag=$etag';
+    }
+
+    final result = {
+      'username': username,
+      'name': name,
+      'avatarUrl': withAuthQuery(avatar).toString(),
+    };
+
+    _cachedMe = result;
+    _lastMeFetch = DateTime.now();
+
+    return result;
+  }
+
+  static Future<bool> setAvatar(File file) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/users.setAvatar');
+    final req = http.MultipartRequest('POST', uri)
+      ..headers.addAll(_authHeaders)
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'image',
+          file.path,
+          filename: basename(file.path),
+          contentType: MediaType.parse(getMimeType(file.path)),
+        ),
+      );
+
+    try {
+      final res = await req.send();
+      final body = await res.stream.bytesToString();
+      print('⬅️ setAvatar ← ${res.statusCode} $body');
+
+      if (res.statusCode == 429) {
+        print('⚠️ setAvatar rate limited');
+        return false;
+      }
+
+      if (res.statusCode != 200) return false;
+
+      _cachedMe = null;
+      _avatarCache.remove(_userId);
+
+      final d = jsonDecode(body) as Map<String, dynamic>;
+      return d['success'] == true;
+    } catch (e) {
+      print('❌ setAvatar error: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> setRoomMute(String roomId, bool mute) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/rooms.saveNotification');
+    final body = jsonEncode({
+      'roomId': roomId,
+      'notifications': {
+        'mobilePushNotifications': mute ? 'nothing' : 'all',
+      }
+    });
+
+    try {
+      final resp = await http.post(uri, headers: _headers, body: body);
+
+      if (resp.statusCode == 429) {
+        print('⚠️ setRoomMute rate limited');
+        return false;
+      }
+
+      if (resp.statusCode != 200) {
+        print('❌ setRoomMute failed: ${resp.statusCode} ${resp.body}');
+        return false;
+      }
+      final d = jsonDecode(resp.body) as Map<String, dynamic>;
+      return d['success'] == true;
+    } catch (e) {
+      print('❌ setRoomMute error: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> reactToMessage(String messageId, String emoji) async {
+    try {
+      final resp = await http.post(
+        Uri.parse('$_baseUrl/api/v1/chat.react'),
+        headers: _headers,
+        body: jsonEncode({'messageId': messageId, 'emoji': emoji}),
+      );
+
+      if (resp.statusCode == 429) {
+        print('⚠️ reactToMessage rate limited');
+        return false;
+      }
+
+      if (resp.statusCode != 200) return false;
+      final d = jsonDecode(resp.body) as Map<String, dynamic>;
+      return d['success'] == true;
+    } catch (e) {
+      print('❌ reactToMessage error: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteMessage(String roomId, String messageId) async {
+    try {
+      final resp = await http.post(
+        Uri.parse('$_baseUrl/api/v1/chat.delete'),
+        headers: _headers,
+        body: jsonEncode({'roomId': roomId, 'msgId': messageId}),
+      );
+
+      if (resp.statusCode == 429) {
+        print('⚠️ deleteMessage rate limited');
+        return false;
+      }
+
+      if (resp.statusCode != 200) return false;
+      final d = jsonDecode(resp.body) as Map<String, dynamic>;
+      return d['success'] == true;
+    } catch (e) {
+      print('❌ deleteMessage error: $e');
+      return false;
+    }
+  }
+
+  static void clearCaches() {
+    _avatarCache.clear();
+    _cachedMe = null;
+    _lastMeFetch = null;
+    _lastAvatarFetch = null;
+
+    _messagesRateLimitedUntil = null;
+  }
+}

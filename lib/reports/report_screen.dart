@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../main_screen.dart';
 import 'package:ics_messenger_app/session_manager.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -37,7 +36,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
   String? _authToken;
   String? _userId;
-  String? _accessToken;
 
   @override
   void initState() {
@@ -52,7 +50,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
     _loadUsername();
     _loadAuthHeaders();
-    _loadAccessToken();
   }
 
   @override
@@ -75,17 +72,9 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _loadAuthHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _authToken = prefs.getString('rocketchat_auth_token') ?? '';
-      _userId = prefs.getString('rocketchat_user_id') ?? '';
-    });
-  }
-
-  Future<void> _loadAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _accessToken = prefs.getString('access_token') ?? '';
+      _authToken = SessionManager.rocketchatAuthToken ?? '';
+      _userId = SessionManager.rocketchatUserId ?? '';
     });
   }
 
@@ -220,7 +209,9 @@ class _ReportScreenState extends State<ReportScreen> {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(
                       builder: (context) => MainScreen(
-                        accessToken: _accessToken ?? '',
+                        // MainScreen.accessToken is a legacy parameter name;
+                        // it holds the Rocket.Chat auth token throughout the app.
+                        accessToken: _authToken ?? '',
                         username: SessionManager.username ?? username ?? '',
                         initialTab: 0,
                       ),

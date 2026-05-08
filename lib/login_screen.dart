@@ -34,26 +34,26 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadSavedCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUsername = prefs.getString('saved_username');
-    final savedPassword = prefs.getString('saved_password');
 
-    if (savedUsername != null && savedPassword != null) {
+    if (savedUsername != null) {
       setState(() {
         usernameController.text = savedUsername;
-        passwordController.text = savedPassword;
         rememberMe = true;
       });
     }
+    // Migrate: remove any previously stored plaintext password.
+    await prefs.remove('saved_password');
   }
 
   Future<void> _saveCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     if (rememberMe) {
       await prefs.setString('saved_username', usernameController.text);
-      await prefs.setString('saved_password', passwordController.text);
     } else {
       await prefs.remove('saved_username');
-      await prefs.remove('saved_password');
     }
+    // Passwords must never be stored locally.
+    await prefs.remove('saved_password');
   }
 
   Future<void> _login() async {

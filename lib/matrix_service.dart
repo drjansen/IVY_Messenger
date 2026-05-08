@@ -6,6 +6,7 @@ import 'package:path/path.dart' show basename;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -29,16 +30,40 @@ class MatrixService {
   // --- Rate limit state (messages) ---
   static DateTime? _messagesRateLimitedUntil;
 
+  static const _secure = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+  static const _keyAuthToken = 'matrix_auth_token';
+  static const _keyUserId = 'matrix_user_id';
+
   static Future<void> persistSession() async {
+    await _secure.write(key: _keyAuthToken, value: _authToken);
+    await _secure.write(key: _keyUserId, value: _userId);
+    // Migrate: remove any tokens previously written to plain SharedPreferences.
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('matrix_auth_token', _authToken);
-    await prefs.setString('matrix_user_id', _userId);
+    await prefs.remove('matrix_auth_token');
+    await prefs.remove('matrix_user_id');
   }
 
   static Future<bool> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('matrix_auth_token');
-    final userId = prefs.getString('matrix_user_id');
+    var token = await _secure.read(key: _keyAuthToken);
+    var userId = await _secure.read(key: _keyUserId);
+
+    // Migrate: move tokens from plain SharedPreferences to secure storage.
+    if (token == null || userId == null) {
+      final prefs = await SharedPreferences.getInstance();
+      final legacyToken = prefs.getString('matrix_auth_token');
+      final legacyUserId = prefs.getString('matrix_user_id');
+      if (legacyToken != null && legacyUserId != null) {
+        await _secure.write(key: _keyAuthToken, value: legacyToken);
+        await _secure.write(key: _keyUserId, value: legacyUserId);
+        await prefs.remove('matrix_auth_token');
+        await prefs.remove('matrix_user_id');
+        token = legacyToken;
+        userId = legacyUserId;
+      }
+    }
+
     if (token != null && userId != null) {
       _authToken = token;
       _userId = userId;
@@ -276,8 +301,6 @@ class MatrixService {
     _messagesRateLimitedUntil = null;
 
     await persistSession();
-    print('🔒 [AUTH TOKEN] $_authToken');
-    print('👤 [USER ID] $_userId');
     return true;
   }
 
@@ -705,8 +728,6 @@ class MatrixService {
     if (kIsWeb) return;
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) return;
-    print('🔑 [FCM Token] $token');
-    print('🔒 [AUTH TOKEN] $_authToken');
 
     try {
       await http.post(

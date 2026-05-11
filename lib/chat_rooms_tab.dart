@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert'; // ✅ ADDED: For JSON encoding/decoding
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,13 +58,18 @@ class _ChatRoomsTabState extends State<ChatRoomsTab>
     _initializeRooms();
 
     _fcmSub = FirebaseMessaging.onMessage.listen((msg) {
-      // ✅ DEBUG: Inspect incoming push payloads (DM vs channel vs discussion)
-      debugPrint('📩 FCM onMessage data: ${msg.data}');
-      debugPrint(
-          '📩 FCM onMessage notification: title=${msg.notification?.title} body=${msg.notification?.body}');
+      // Gate FCM payload inspection behind debug mode — message data and
+      // notification bodies must not appear in release logs.
+      if (kDebugMode) {
+        debugPrint('📩 FCM onMessage data: ${msg.data}');
+        debugPrint(
+            '📩 FCM onMessage notification: title=${msg.notification?.title} body=${msg.notification?.body}');
+      }
 
       final rid = (msg.data['room_id'] ?? msg.data['rid']) as String?;
-      debugPrint('📩 Parsed rid=$rid');
+      if (kDebugMode) {
+        debugPrint('📩 Parsed rid=$rid');
+      }
 
       if (rid != null && mutedRooms[rid] != true) {
         if (mounted) {
@@ -79,7 +85,9 @@ class _ChatRoomsTabState extends State<ChatRoomsTab>
         // ✅ Trigger a background recompute soon-ish (throttled) so counts become accurate
         _requestComputeForRoom(rid);
       } else {
-        debugPrint('📩 No rid found or room muted; not incrementing unread.');
+        if (kDebugMode) {
+          debugPrint('📩 No rid found or room muted; not incrementing unread.');
+        }
       }
     });
   }
@@ -110,7 +118,9 @@ class _ChatRoomsTabState extends State<ChatRoomsTab>
           loading = rooms.isEmpty;
         });
       } catch (e) {
-        debugPrint("Error decoding cached rooms: $e");
+        if (kDebugMode) {
+          debugPrint("Error decoding cached rooms: $e");
+        }
       }
     }
   }
@@ -238,7 +248,9 @@ class _ChatRoomsTabState extends State<ChatRoomsTab>
     try {
       fetched = await MatrixService.fetchJoinedRoomIds(widget.accessToken);
     } catch (e) {
-      debugPrint('❌ fetchRooms error: $e');
+      if (kDebugMode) {
+        debugPrint('❌ fetchRooms error: $e');
+      }
       if (mounted) {
         setState(() => loading = false);
       }

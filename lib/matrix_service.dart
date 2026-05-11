@@ -10,6 +10,29 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+enum MatrixLoginStatus {
+  success,
+  twoFactorRequired,
+  twoFactorInvalid,
+  failure,
+}
+
+class MatrixLoginResult {
+  final MatrixLoginStatus status;
+  final String? twoFactorMethod;
+  final String? emailOrUsername;
+  final String? message;
+
+  const MatrixLoginResult({
+    required this.status,
+    this.twoFactorMethod,
+    this.emailOrUsername,
+    this.message,
+  });
+
+  bool get isSuccess => status == MatrixLoginStatus.success;
+}
+
 class MatrixService {
   static const _baseUrl = 'https://app.icsportals.org';
   static late String _authToken;
@@ -346,27 +369,96 @@ class MatrixService {
     }
   }
 
-  static Future<bool> login(String username, String password) async {
-    final resp = await http.post(
-      Uri.parse('$_baseUrl/api/v1/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'user': username, 'password': password}),
-    );
-    if (resp.statusCode != 200) {
-      print('❌ Login failed: ${resp.body}');
-      return false;
+  /// Parses a non-200 login response body and returns the appropriate
+  /// [MatrixLoginResult].  Exposed for testing via
+  /// [parseFailedLoginResponseForTesting].
+  static MatrixLoginResult _parseFailedLoginResponse(String body) {
+    try {
+      final decoded = jsonDecode(body) as Map<String, dynamic>?;
+      final errorType =
+          (decoded?['errorType'] ?? decoded?['error'])?.toString();
+      if (errorType == 'totp-required') {
+        final details = decoded?['details'] as Map<String, dynamic>?;
+        return MatrixLoginResult(
+          status: MatrixLoginStatus.twoFactorRequired,
+          twoFactorMethod: details?['method']?.toString(),
+          emailOrUsername: details?['emailOrUsername']?.toString(),
+        );
+      }
+      if (errorType == 'totp-invalid') {
+        final details = decoded?['details'] as Map<String, dynamic>?;
+        return MatrixLoginResult(
+          status: MatrixLoginStatus.twoFactorInvalid,
+          twoFactorMethod: details?['method']?.toString(),
+        );
+      }
+    } catch (_) {}
+    return const MatrixLoginResult(status: MatrixLoginStatus.failure);
+  }
+
+  /// Exposed for unit testing only.
+  static MatrixLoginResult parseFailedLoginResponseForTesting(String body) =>
+      _parseFailedLoginResponse(body);
+
+  static Future<MatrixLoginResult> login(
+    String username,
+    String password, {
+    String? twoFactorCode,
+    String? twoFactorMethod,
+  }) async {
+    try {
+      final headers = {'Content-Type': 'application/json'};
+      if (twoFactorCode != null && twoFactorCode.isNotEmpty) {
+        headers['x-2fa-code'] = twoFactorCode;
+        headers['x-2fa-method'] =
+            (twoFactorMethod != null && twoFactorMethod.isNotEmpty)
+                ? twoFactorMethod
+                : 'totp';
+      }
+
+      final body = <String, dynamic>{
+        'user': username,
+        'password': password,
+      };
+      if (twoFactorCode != null && twoFactorCode.isNotEmpty) {
+        body['code'] = twoFactorCode;
+      }
+
+      final resp = await http.post(
+        Uri.parse('$_baseUrl/api/v1/login'),
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      if (resp.statusCode != 200) {
+        // ignore: avoid_print
+        print('❌ Login failed: ${resp.body}');
+        return _parseFailedLoginResponse(resp.body);
+      }
+
+      final data =
+          (jsonDecode(resp.body)['data']) as Map<String, dynamic>;
+      final authToken = data['authToken'] as String?;
+      final userId = data['userId'] as String?;
+      if (authToken == null || userId == null) {
+        return const MatrixLoginResult(status: MatrixLoginStatus.failure);
+      }
+
+      _authToken = authToken;
+      _userId = userId;
+
+      _avatarCache.clear();
+      _cachedMe = null;
+      _lastMeFetch = null;
+      _messagesRateLimitedUntil = null;
+
+      await persistSession();
+      return const MatrixLoginResult(status: MatrixLoginStatus.success);
+    } catch (e) {
+      // ignore: avoid_print
+      print('❌ Login exception: $e');
+      return const MatrixLoginResult(status: MatrixLoginStatus.failure);
     }
-    final data = (jsonDecode(resp.body)['data']) as Map<String, dynamic>;
-    _authToken = data['authToken'] as String;
-    _userId = data['userId'] as String;
-
-    _avatarCache.clear();
-    _cachedMe = null;
-    _lastMeFetch = null;
-    _messagesRateLimitedUntil = null;
-
-    await persistSession();
-    return true;
   }
 
   static Future<List<Map<String, dynamic>>> fetchJoinedRoomIds(String _) async {

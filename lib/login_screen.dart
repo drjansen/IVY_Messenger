@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'matrix_service.dart';
 import 'main_screen.dart';
 import 'session_manager.dart';
+import 'two_factor_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -66,38 +67,54 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final username = usernameController.text.trim();
     final password = passwordController.text;
-    final success = await MatrixService.login(
-      username,
-      password,
-    );
+    final result = await MatrixService.login(username, password);
 
     setState(() => loading = false);
 
-    if (success) {
-      await _saveCredentials();
-      await FirebaseMessaging.instance
-          .requestPermission(alert: true, badge: true, sound: true);
-      await MatrixService.registerPushToken('');
-
-      // Save session info centrally using SessionManager
-      await SessionManager.saveSession(
-        username: username,
-        rocketchatAuthToken: MatrixService.rocketchatAuthToken ?? '',
-        rocketchatUserId: MatrixService.rocketchatUserId ?? '',
-      );
-
-      Navigator.pushReplacement(
+    if (result.status == MatrixLoginStatus.twoFactorRequired) {
+      final twoFactorOk = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (_) => MainScreen(
-            accessToken: MatrixService.authToken,
+          builder: (_) => TwoFactorScreen(
             username: username,
+            password: password,
+            method: result.twoFactorMethod,
+            emailOrUsername: result.emailOrUsername,
           ),
         ),
       );
+      if (twoFactorOk != true) return;
+      await _finishSuccessfulLogin(username);
+    } else if (result.isSuccess) {
+      await _finishSuccessfulLogin(username);
     } else {
       setState(() => error = tr('invalid_credentials'));
     }
+  }
+
+  Future<void> _finishSuccessfulLogin(String username) async {
+    await _saveCredentials();
+    await FirebaseMessaging.instance
+        .requestPermission(alert: true, badge: true, sound: true);
+    await MatrixService.registerPushToken('');
+
+    // Save session info centrally using SessionManager
+    await SessionManager.saveSession(
+      username: username,
+      rocketchatAuthToken: MatrixService.rocketchatAuthToken ?? '',
+      rocketchatUserId: MatrixService.rocketchatUserId ?? '',
+    );
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MainScreen(
+          accessToken: MatrixService.authToken,
+          username: username,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadSavedLocale() async {

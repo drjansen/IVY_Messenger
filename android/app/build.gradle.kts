@@ -56,11 +56,18 @@ android {
             // Use the release signing config only when key.properties is present.
             // Do NOT fall back to the debug signing config — debug keys must never
             // be used to sign production releases.
-            signingConfig = if (keyPropertiesFile.exists()) {
-                signingConfigs.getByName("release")
+            if (keyPropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
             } else {
-                null  // Unsigned APK. Google Play will reject this; configure
-                      // key.properties locally or in CI before publishing.
+                // Emit a visible warning so developers know the APK will be unsigned.
+                // Google Play will reject unsigned APKs, so this must be resolved
+                // before publishing. See SECURITY.md for setup instructions.
+                logger.warn(
+                    "[WARN] android/key.properties not found. " +
+                    "Release APK will be UNSIGNED and cannot be published to Google Play. " +
+                    "See SECURITY.md for release signing setup instructions."
+                )
+                signingConfig = null
             }
             // Use ProGuard files for release, appending missing rules if needed
             proguardFiles(

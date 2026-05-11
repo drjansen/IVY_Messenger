@@ -476,6 +476,9 @@ class MatrixService {
           print('❌ Login failed: ${resp.statusCode}');
           return true;
         }());
+        // Note: _parseFailedLoginResponse reads the body only to distinguish
+        // 2FA challenges (totp-required/totp-invalid) from generic failures.
+        // It does not log any part of the response body.
         return _parseFailedLoginResponse(resp.body);
       }
 

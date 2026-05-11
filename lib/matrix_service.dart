@@ -407,8 +407,9 @@ class MatrixService {
     String? twoFactorMethod,
   }) async {
     try {
+      final has2fa = twoFactorCode != null && twoFactorCode.isNotEmpty;
       final headers = {'Content-Type': 'application/json'};
-      if (twoFactorCode != null && twoFactorCode.isNotEmpty) {
+      if (has2fa) {
         headers['x-2fa-code'] = twoFactorCode;
         headers['x-2fa-method'] =
             (twoFactorMethod != null && twoFactorMethod.isNotEmpty)
@@ -420,7 +421,7 @@ class MatrixService {
         'user': username,
         'password': password,
       };
-      if (twoFactorCode != null && twoFactorCode.isNotEmpty) {
+      if (has2fa) {
         body['code'] = twoFactorCode;
       }
 

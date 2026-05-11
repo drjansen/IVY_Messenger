@@ -27,8 +27,7 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
   String _error = '';
 
   String get _prompt {
-    final method = widget.method?.toLowerCase();
-    if (method == 'email') {
+    if (_isEmail) {
       final target = widget.emailOrUsername;
       if (target != null && target.isNotEmpty) {
         return tr(
@@ -42,8 +41,7 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
   }
 
   bool get _isEmail =>
-      widget.method != null &&
-      widget.method!.toLowerCase() == 'email';
+      widget.method?.toLowerCase() == 'email';
 
   Future<void> _submitCode() async {
     final code = _codeController.text.trim();
@@ -64,10 +62,10 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
       twoFactorMethod: widget.method,
     );
 
+    if (!mounted) return;
     setState(() => _loading = false);
 
     if (result.isSuccess) {
-      if (!mounted) return;
       Navigator.pop(context, true);
     } else if (result.status == MatrixLoginStatus.twoFactorInvalid) {
       setState(() => _error = tr('two_factor_invalid_code'));

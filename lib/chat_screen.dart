@@ -144,8 +144,10 @@ bool _isImageExtensionStatic(String url) {
 final attachmentCache = CacheManager(
   Config(
     'attachmentCache',
-    stalePeriod: const Duration(days: 30),
-    maxNrOfCacheObjects: 500,
+    // Reduced from 30 days / 500 objects to limit local retention of
+    // potentially sensitive media attachments.
+    stalePeriod: const Duration(days: 7),
+    maxNrOfCacheObjects: 100,
   ),
 );
 

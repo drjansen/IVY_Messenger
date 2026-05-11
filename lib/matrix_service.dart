@@ -204,7 +204,11 @@ class MatrixService {
       try {
         resp = await http.get(current, headers: _authHeaders).timeout(timeout);
       } catch (e) {
-        print('❌ fetchAuthedBytes error for ${_safeUri(current)}: $e');
+        assert(() {
+          // ignore: avoid_print
+          print('❌ fetchAuthedBytes error for ${_safeUri(current)}: $e');
+          return true;
+        }());
         return null;
       }
 
@@ -217,7 +221,11 @@ class MatrixService {
           status == 308) {
         final loc = resp.headers['location'];
         if (loc == null || loc.isEmpty) {
-          print('❌ fetchAuthedBytes redirect without location for ${_safeUri(current)}');
+          assert(() {
+            // ignore: avoid_print
+            print('❌ fetchAuthedBytes redirect without location for ${_safeUri(current)}');
+            return true;
+          }());
           return null;
         }
         current = Uri.parse(loc.startsWith('http') ? loc : '$_baseUrl$loc');
@@ -225,40 +233,63 @@ class MatrixService {
       }
 
       if (status != 200) {
-        final ct = resp.headers['content-type'];
-        print(
-            '❌ fetchAuthedBytes non-200=$status ct=$ct url=${_safeUri(current)} bytes=${resp.bodyBytes.length}');
-        final preview = resp.bodyBytes.isNotEmpty
-            ? utf8.decode(resp.bodyBytes.take(250).toList(),
-            allowMalformed: true)
-            : '';
-        if (preview.isNotEmpty) {
-          print('❌ fetchAuthedBytes body preview: $preview');
-        }
+        assert(() {
+          final ct = resp.headers['content-type'];
+          // ignore: avoid_print
+          print(
+              '❌ fetchAuthedBytes non-200=$status ct=$ct url=${_safeUri(current)} bytes=${resp.bodyBytes.length}');
+          final preview = resp.bodyBytes.isNotEmpty
+              ? utf8.decode(resp.bodyBytes.take(250).toList(),
+              allowMalformed: true)
+              : '';
+          if (preview.isNotEmpty) {
+            // ignore: avoid_print
+            print('❌ fetchAuthedBytes body preview: $preview');
+          }
+          return true;
+        }());
         return null;
       }
 
       if (resp.bodyBytes.isEmpty) {
-        print('❌ fetchAuthedBytes empty body for ${_safeUri(current)}');
+        assert(() {
+          // ignore: avoid_print
+          print('❌ fetchAuthedBytes empty body for ${_safeUri(current)}');
+          return true;
+        }());
         return null;
       }
 
       return resp.bodyBytes;
     }
 
-    print('❌ fetchAuthedBytes exceeded maxRedirects=$maxRedirects for ${_safeUri(_abs(url))}');
+    assert(() {
+      // ignore: avoid_print
+      print('❌ fetchAuthedBytes exceeded maxRedirects=$maxRedirects for ${_safeUri(_abs(url))}');
+      return true;
+    }());
     return null;
   }
 
   static Future<void> probeUrl(String url) async {
-    final uri = _abs(url);
-    try {
-      final resp = await http.get(uri, headers: _authHeaders);
-      print(
-          '🔎 probeUrl ${_safeUri(uri)} -> ${resp.statusCode} ct=${resp.headers['content-type']} bytes=${resp.bodyBytes.length}');
-    } catch (e) {
-      print('❌ probeUrl error for ${_safeUri(uri)}: $e');
-    }
+    assert(() {
+      // probeUrl is a debug-only diagnostic helper; compile out of release.
+      _abs(url); // validate the URL parses.
+      return true;
+    }());
+    // Only run the actual network probe in debug mode.
+    assert(() {
+      final uri = _abs(url);
+      http.get(uri, headers: _authHeaders).then((resp) {
+        // ignore: avoid_print
+        print(
+            '🔎 probeUrl ${_safeUri(uri)} -> ${resp.statusCode} ct=${resp.headers['content-type']} bytes=${resp.bodyBytes.length}');
+      }).catchError((Object e) {
+        // ignore: avoid_print
+        print('❌ probeUrl error for ${_safeUri(_abs(url))}: $e');
+      });
+      return true;
+    }());
   }
 
   static String getMimeType(String filePathOrName) {
@@ -328,7 +359,11 @@ class MatrixService {
       );
 
       if (resp.statusCode == 429) {
-        print('⚠️ _getUserAvatar rate limited for $userId');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ _getUserAvatar rate limited for $userId');
+          return true;
+        }());
         final defaultAvatar = withAuthQuery('/avatar/$userId').toString();
         _avatarCache[userId] = defaultAvatar;
         return defaultAvatar;
@@ -362,7 +397,11 @@ class MatrixService {
       _avatarCache[userId] = authed;
       return authed;
     } catch (e) {
-      print('❌ _getUserAvatar error for $userId: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ _getUserAvatar error for $userId: $e');
+        return true;
+      }());
       final defaultAvatar = withAuthQuery('/avatar/$userId').toString();
       _avatarCache[userId] = defaultAvatar;
       return defaultAvatar;
@@ -432,8 +471,11 @@ class MatrixService {
       );
 
       if (resp.statusCode != 200) {
-        // ignore: avoid_print
-        print('❌ Login failed: ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('❌ Login failed: ${resp.statusCode}');
+          return true;
+        }());
         return _parseFailedLoginResponse(resp.body);
       }
 
@@ -456,8 +498,11 @@ class MatrixService {
       await persistSession();
       return const MatrixLoginResult(status: MatrixLoginStatus.success);
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ Login exception: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ Login exception: $e');
+        return true;
+      }());
       return const MatrixLoginResult(status: MatrixLoginStatus.failure);
     }
   }
@@ -470,12 +515,20 @@ class MatrixService {
       );
 
       if (resp.statusCode == 429) {
-        print('⚠️ fetchJoinedRoomIds rate limited: ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ fetchJoinedRoomIds rate limited');
+          return true;
+        }());
         return [];
       }
 
       if (resp.statusCode != 200) {
-        print('❌ fetchRooms failed: ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('❌ fetchRooms failed: ${resp.statusCode}');
+          return true;
+        }());
         return [];
       }
 
@@ -526,7 +579,11 @@ class MatrixService {
         };
       }).toList();
     } catch (e) {
-      print('❌ fetchJoinedRoomIds error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ fetchJoinedRoomIds error: $e');
+        return true;
+      }());
       return [];
     }
   }
@@ -535,8 +592,12 @@ class MatrixService {
       String roomId, String roomType) async {
     if (_messagesRateLimitedUntil != null &&
         DateTime.now().isBefore(_messagesRateLimitedUntil!)) {
-      print(
-          '⏳ fetchMessages skipped until $_messagesRateLimitedUntil (rate limited)');
+      assert(() {
+        // ignore: avoid_print
+        print(
+            '⏳ fetchMessages skipped until $_messagesRateLimitedUntil (rate limited)');
+        return true;
+      }());
       return [];
     }
 
@@ -553,19 +614,31 @@ class MatrixService {
       );
 
       if (resp.statusCode == 429) {
-        print('⚠️ fetchMessages rate limited: ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ fetchMessages rate limited');
+          return true;
+        }());
         final waitSeconds = _parseRetryAfterSecondsFromBody(resp.body);
         final backoff = Duration(seconds: (waitSeconds ?? 30) + 1);
         _messagesRateLimitedUntil = DateTime.now().add(backoff);
-        print(
-            '⏳ fetchMessages cooldown set for ${backoff.inSeconds}s (until $_messagesRateLimitedUntil)');
+        assert(() {
+          // ignore: avoid_print
+          print(
+              '⏳ fetchMessages cooldown set for ${backoff.inSeconds}s (until $_messagesRateLimitedUntil)');
+          return true;
+        }());
         return [];
       }
 
       _messagesRateLimitedUntil = null;
 
       if (resp.statusCode != 200) {
-        print('❌ fetchMessages failed: ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('❌ fetchMessages failed: ${resp.statusCode}');
+          return true;
+        }());
         return [];
       }
 
@@ -620,7 +693,11 @@ class MatrixService {
 
       return results.reversed.toList();
     } catch (e) {
-      print('❌ fetchMessages error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ fetchMessages error: $e');
+        return true;
+      }());
       return [];
     }
   }
@@ -647,18 +724,30 @@ class MatrixService {
       );
 
       if (resp.statusCode == 429) {
-        print('⚠️ sendMessage rate limited: ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ sendMessage rate limited');
+          return true;
+        }());
         return false;
       }
 
       if (resp.statusCode != 200) {
-        print('❌ sendMessage failed: ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('❌ sendMessage failed: ${resp.statusCode}');
+          return true;
+        }());
         return false;
       }
       final d = jsonDecode(resp.body) as Map<String, dynamic>;
       return d['success'] == true;
     } catch (e) {
-      print('❌ sendMessage error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ sendMessage error: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -697,7 +786,11 @@ class MatrixService {
       }());
 
       if (res.statusCode == 429) {
-        print('⚠️ rooms.media rate limited');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ rooms.media rate limited');
+          return true;
+        }());
         return null;
       }
 
@@ -715,7 +808,11 @@ class MatrixService {
 
       return file;
     } catch (e) {
-      print('❌ rooms.media upload error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ rooms.media upload error: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -755,7 +852,11 @@ class MatrixService {
       }());
 
       if (res.statusCode == 429) {
-        print('⚠️ rooms.media(bytes) rate limited');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ rooms.media(bytes) rate limited');
+          return true;
+        }());
         return null;
       }
 
@@ -773,7 +874,11 @@ class MatrixService {
 
       return file;
     } catch (e) {
-      print('❌ rooms.media(bytes) upload error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ rooms.media(bytes) upload error: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -826,7 +931,11 @@ class MatrixService {
       );
 
       if (resp.statusCode == 429) {
-        print('⚠️ chat.postMessage(file) rate limited: ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ chat.postMessage(file) rate limited');
+          return true;
+        }());
         return false;
       }
 
@@ -840,7 +949,11 @@ class MatrixService {
       final d = jsonDecode(resp.body) as Map<String, dynamic>;
       return d['success'] == true;
     } catch (e) {
-      print('❌ chat.postMessage(file) error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ chat.postMessage(file) error: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -856,12 +969,20 @@ class MatrixService {
 
       final ok =
       await _postFileMessage(roomId: roomId, file: file, message: message);
-      if (!ok) {
-        print('❌ uploadFile: upload succeeded but posting message failed.');
-      }
+      assert(() {
+        if (!ok) {
+          // ignore: avoid_print
+          print('❌ uploadFile: upload succeeded but posting message failed.');
+        }
+        return true;
+      }());
       return ok;
     } catch (e) {
-      print('❌ uploadFile error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ uploadFile error: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -884,12 +1005,20 @@ class MatrixService {
 
       final ok =
       await _postFileMessage(roomId: roomId, file: file, message: message);
-      if (!ok) {
-        print('❌ uploadBytes: upload succeeded but posting message failed.');
-      }
+      assert(() {
+        if (!ok) {
+          // ignore: avoid_print
+          print('❌ uploadBytes: upload succeeded but posting message failed.');
+        }
+        return true;
+      }());
       return ok;
     } catch (e) {
-      print('❌ uploadBytes error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ uploadBytes error: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -910,7 +1039,11 @@ class MatrixService {
         }),
       );
     } catch (e) {
-      print('❌ registerPushToken error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ registerPushToken error: $e');
+        return true;
+      }());
     }
   }
 
@@ -923,18 +1056,30 @@ class MatrixService {
       );
 
       if (resp.statusCode == 429) {
-        print('⚠️ markRoomAsRead rate limited');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ markRoomAsRead rate limited');
+          return true;
+        }());
         return false;
       }
 
       if (resp.statusCode != 200) {
-        print('❌ markRoomAsRead failed: ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('❌ markRoomAsRead failed: ${resp.statusCode}');
+          return true;
+        }());
         return false;
       }
       final d = jsonDecode(resp.body) as Map<String, dynamic>;
       return d['success'] == true;
     } catch (e) {
-      print('❌ markRoomAsRead error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ markRoomAsRead error: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -955,7 +1100,11 @@ class MatrixService {
       );
 
       if (resp.statusCode == 429) {
-        print('⚠️ getMe rate limited');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ getMe rate limited');
+          return true;
+        }());
         if (_cachedMe != null) return _cachedMe!;
         return {
           'username': _userId,
@@ -983,7 +1132,11 @@ class MatrixService {
         }
       }
     } catch (e) {
-      print('❌ getMe /me endpoint error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ getMe /me endpoint error: $e');
+        return true;
+      }());
     }
 
     if (userMap == null) {
@@ -994,7 +1147,11 @@ class MatrixService {
         );
 
         if (info.statusCode == 429) {
-          print('⚠️ getMe users.info rate limited');
+          assert(() {
+            // ignore: avoid_print
+            print('⚠️ getMe users.info rate limited');
+            return true;
+          }());
           if (_cachedMe != null) return _cachedMe!;
           return {
             'username': _userId,
@@ -1011,12 +1168,20 @@ class MatrixService {
           if (raw is Map<String, dynamic>) userMap = Map.from(raw);
         }
       } catch (e) {
-        print('❌ getMe users.info fallback error: $e');
+        assert(() {
+          // ignore: avoid_print
+          print('❌ getMe users.info fallback error: $e');
+          return true;
+        }());
       }
     }
 
     if (userMap == null) {
-      print('❌ getMe: could not retrieve user');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ getMe: could not retrieve user');
+        return true;
+      }());
       return {
         'username': _userId,
         'name': '',
@@ -1070,7 +1235,11 @@ class MatrixService {
       }());
 
       if (res.statusCode == 429) {
-        print('⚠️ setAvatar rate limited');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ setAvatar rate limited');
+          return true;
+        }());
         return false;
       }
 
@@ -1082,7 +1251,11 @@ class MatrixService {
       final d = jsonDecode(body) as Map<String, dynamic>;
       return d['success'] == true;
     } catch (e) {
-      print('❌ setAvatar error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ setAvatar error: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -1100,18 +1273,30 @@ class MatrixService {
       final resp = await http.post(uri, headers: _headers, body: body);
 
       if (resp.statusCode == 429) {
-        print('⚠️ setRoomMute rate limited');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ setRoomMute rate limited');
+          return true;
+        }());
         return false;
       }
 
       if (resp.statusCode != 200) {
-        print('❌ setRoomMute failed: ${resp.statusCode} ${resp.body}');
+        assert(() {
+          // ignore: avoid_print
+          print('❌ setRoomMute failed: ${resp.statusCode}');
+          return true;
+        }());
         return false;
       }
       final d = jsonDecode(resp.body) as Map<String, dynamic>;
       return d['success'] == true;
     } catch (e) {
-      print('❌ setRoomMute error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ setRoomMute error: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -1125,7 +1310,11 @@ class MatrixService {
       );
 
       if (resp.statusCode == 429) {
-        print('⚠️ reactToMessage rate limited');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ reactToMessage rate limited');
+          return true;
+        }());
         return false;
       }
 
@@ -1133,7 +1322,11 @@ class MatrixService {
       final d = jsonDecode(resp.body) as Map<String, dynamic>;
       return d['success'] == true;
     } catch (e) {
-      print('❌ reactToMessage error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ reactToMessage error: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -1147,7 +1340,11 @@ class MatrixService {
       );
 
       if (resp.statusCode == 429) {
-        print('⚠️ deleteMessage rate limited');
+        assert(() {
+          // ignore: avoid_print
+          print('⚠️ deleteMessage rate limited');
+          return true;
+        }());
         return false;
       }
 
@@ -1155,7 +1352,11 @@ class MatrixService {
       final d = jsonDecode(resp.body) as Map<String, dynamic>;
       return d['success'] == true;
     } catch (e) {
-      print('❌ deleteMessage error: $e');
+      assert(() {
+        // ignore: avoid_print
+        print('❌ deleteMessage error: $e');
+        return true;
+      }());
       return false;
     }
   }

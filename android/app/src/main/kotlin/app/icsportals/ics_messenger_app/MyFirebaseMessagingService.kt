@@ -56,12 +56,24 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
       )
     }
 
+    // Generic notification shown on the lock screen / when the device is locked.
+    // This avoids leaking sensitive message content to the lock screen.
+    val publicNotif = NotificationCompat.Builder(this, channelId)
+      .setSmallIcon(R.mipmap.ic_launcher)
+      .setContentTitle("ICS Messenger")
+      .setContentText("New message")
+      .build()
+
     val notif = NotificationCompat.Builder(this, channelId)
       .setSmallIcon(R.mipmap.ic_launcher)
       // ← Use our cleaned-up title
       .setContentTitle(displayTitle.ifBlank { "New message" })
       .setContentText(message.notification?.body ?: "")
       .setAutoCancel(true)
+      // Hide sensitive content on the lock screen; show the generic public
+      // version instead so message text is not visible without authentication.
+      .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+      .setPublicVersion(publicNotif)
       .build()
 
     // Use the roomId hash as a unique notification ID (if null, use 0)

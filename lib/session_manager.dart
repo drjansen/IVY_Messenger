@@ -85,6 +85,16 @@ class SessionManager {
     await prefs.remove('rocketchat_auth_token');
     await prefs.remove('rocketchat_user_id');
 
+    // Clear sensitive data caches that are keyed by session.
+    // These caches contain PII (attendance, student/child records, menu,
+    // announcements, calendar events, chat rooms) and must not persist
+    // across sessions or after logout.
+    await prefs.remove('cached_announcements');
+    await prefs.remove('cached_children');
+    await prefs.remove('cached_lunch_menu');
+    await prefs.remove('cached_chat_rooms');
+    await prefs.remove('calendar_events');
+
     username = null;
     rocketchatAuthToken = null;
     rocketchatUserId = null;

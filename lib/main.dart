@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -62,7 +63,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     onDidReceiveNotificationResponse: (NotificationResponse response) {
       final String? payload = response.payload;
       if (payload != null) {
-        print('🔔 [FCM BG] Notification tapped with payload: $payload');
+        if (kDebugMode) {
+          print('🔔 [FCM BG] Notification tapped with payload: $payload');
+        }
         // TODO: navigate to chat room with ID = payload
       }
     },
@@ -128,7 +131,9 @@ class _ICSAppState extends State<ICSApp> with WidgetsBindingObserver {
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         final String? payload = response.payload;
         if (payload != null) {
-          print('🔔 [FCM] Foreground notification tapped with payload: $payload');
+          if (kDebugMode) {
+            print('🔔 [FCM] Foreground notification tapped with payload: $payload');
+          }
           // TODO: navigate to chat room with ID = payload
         }
       },
@@ -140,10 +145,14 @@ class _ICSAppState extends State<ICSApp> with WidgetsBindingObserver {
 
       // Only show notification if the user is NOT in the chat room.
       if (chatRoomId != AppState.currentChatRoomId) {
-        print('🔔 [FCM] Foreground message for a different room. Showing notification.');
+        if (kDebugMode) {
+          print('🔔 [FCM] Foreground message for a different room. Showing notification.');
+        }
         showSimpleNotification(message);
       } else {
-        print('🔔 [FCM] Foreground message for active room. Suppressing notification.');
+        if (kDebugMode) {
+          print('🔔 [FCM] Foreground message for active room. Suppressing notification.');
+        }
       }
     });
 
@@ -153,7 +162,9 @@ class _ICSAppState extends State<ICSApp> with WidgetsBindingObserver {
         cancelNotificationForCurrentChat(chatRoomId);
         // TODO: handle navigation to the chat
       }
-      print('🔔 [FCM] Notification tapped: ${message.messageId}');
+      if (kDebugMode) {
+        print('🔔 [FCM] Notification tapped: ${message.messageId}');
+      }
     });
   }
 

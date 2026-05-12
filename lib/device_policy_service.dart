@@ -1,0 +1,233 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+
+/// Result of a device-policy check call to the policy backend.
+enum DevicePolicyResult {
+  /// The backend recognised this device and/or registered it as the user's
+  /// first device.  Login may proceed normally.
+  allowed,
+
+  /// The backend rejected this device because a *different* device is already
+  /// registered for the user.  Login must be blocked.
+  denied,
+
+  /// The policy check could not be completed (network error, server error, …).
+  /// Callers may choose to block or allow depending on their fail-open/fail-closed
+  /// preference; the UI layer is responsible for presenting an appropriate message.
+  error,
+}
+
+/// Integrates with the ICS one-device-per-user policy backend.
+///
+/// ## What data is collected
+/// Only the minimum set required by the policy backend:
+/// - `user_id`   – the Rocket.Chat user-ID returned after login (already in-session)
+/// - `username`  – the Rocket.Chat username (already in-session)
+/// - `device_id` – a random, app-installation-specific UUID generated locally on
+///                  first launch and persisted in the platform secure keystore.
+///                  It is **not** a hardware identifier and carries no PII.
+/// - `device_name` – human-readable model string from [device_info_plus]
+///                  (e.g. "Pixel 7 Pro").  Used only for audit display.
+/// - `platform`  – the OS name string (android / ios / web / …)
+/// - `app_version` – the semver string declared in pubspec.yaml
+///
+/// No advertising IDs, IMEI, MAC addresses, or other sensitive hardware
+/// identifiers are collected.  All collected fields are logged by the backend
+/// only in the `device_events` audit table for PIPA-compliance review.
+class DevicePolicyService {
+  // ── Backend configuration ────────────────────────────────────────────────
+
+  /// Base URL of the ICS messenger-app policy backend.
+  ///
+  /// Override this constant when deploying to a different environment.
+  static const _policyBaseUrl = 'https://apppolicy.icsportals.org';
+
+  /// The path of the device-policy check endpoint.
+  static const _checkPath = '/api/v1/device-check';
+
+  /// Pre-shared API key sent in the `X-App-Policy-Key` request header.
+  ///
+  /// The Nginx reverse-proxy in front of the policy backend requires this
+  /// header before forwarding any request.  Because this is an internal,
+  /// closed-distribution app the key is embedded here; treat it as you would
+  /// any low-privilege service credential (rotate on compromise).
+  static const _policyApiKey = 'ics-app-policy-key-2025';
+
+  // ── App metadata ─────────────────────────────────────────────────────────
+
+  /// Semver app version string – keep in sync with pubspec.yaml `version`.
+  static const _appVersion = '1.0.1';
+
+  // ── Secure storage ───────────────────────────────────────────────────────
+
+  static const _secure = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+
+  /// Secure-storage key under which the stable installation ID is persisted.
+  static const _keyDeviceId = 'device_policy_device_id';
+
+  // ── Public API ───────────────────────────────────────────────────────────
+
+  /// Checks the one-device-per-user policy for the authenticated user.
+  ///
+  /// Must be called **after** a successful Rocket.Chat login so that
+  /// [userId] and [username] are available.
+  ///
+  /// Returns:
+  /// - [DevicePolicyResult.allowed]  → login flow may continue
+  /// - [DevicePolicyResult.denied]   → a different device is registered; block login
+  /// - [DevicePolicyResult.error]    → policy service unreachable; caller decides
+  static Future<DevicePolicyResult> checkDevicePolicy({
+    required String userId,
+    required String username,
+  }) async {
+    try {
+      final deviceId = await getOrCreateDeviceId();
+      final deviceInfo = await getDeviceInfo();
+
+      final payload = <String, String>{
+        'user_id': userId,
+        'username': username,
+        'device_id': deviceId,
+        'device_name': deviceInfo.deviceName,
+        'platform': deviceInfo.platform,
+        'app_version': _appVersion,
+      };
+
+      final resp = await http
+          .post(
+            Uri.parse('$_policyBaseUrl$_checkPath'),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-App-Policy-Key': _policyApiKey,
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (resp.statusCode == 200) {
+        return DevicePolicyResult.allowed;
+      }
+
+      // 403 Forbidden / 409 Conflict both mean a *different* device is registered.
+      if (resp.statusCode == 403 || resp.statusCode == 409) {
+        return DevicePolicyResult.denied;
+      }
+
+      // Any other non-200 status is an unexpected server error.
+      assert(() {
+        // ignore: avoid_print
+        print('⚠️ DevicePolicyService: unexpected status ${resp.statusCode}');
+        return true;
+      }());
+      return DevicePolicyResult.error;
+    } catch (e) {
+      assert(() {
+        // ignore: avoid_print
+        print('⚠️ DevicePolicyService: request failed: $e');
+        return true;
+      }());
+      return DevicePolicyResult.error;
+    }
+  }
+
+  // ── Device-ID helpers ────────────────────────────────────────────────────
+
+  /// Returns the stable installation-specific device ID, creating and
+  /// persisting a new one if this is the first launch.
+  ///
+  /// The ID is a randomly generated UUID v4 stored in the platform secure
+  /// keystore.  It is not tied to any hardware identifier.
+  static Future<String> getOrCreateDeviceId() async {
+    var id = await _secure.read(key: _keyDeviceId);
+    if (id == null || id.isEmpty) {
+      id = _generateUuidV4();
+      await _secure.write(key: _keyDeviceId, value: id);
+    }
+    return id;
+  }
+
+  // ── Device-info helpers ──────────────────────────────────────────────────
+
+  /// Collects non-identifying device metadata for the policy request.
+  static Future<_DeviceInfo> getDeviceInfo() async {
+    if (kIsWeb) {
+      return const _DeviceInfo(deviceName: 'Web Browser', platform: 'web');
+    }
+    try {
+      final plugin = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        final info = await plugin.androidInfo;
+        return _DeviceInfo(
+          deviceName: '${info.manufacturer} ${info.model}',
+          platform: 'android',
+        );
+      }
+      if (Platform.isIOS) {
+        final info = await plugin.iosInfo;
+        return _DeviceInfo(
+          deviceName: info.model,
+          platform: 'ios',
+        );
+      }
+      if (Platform.isLinux) {
+        return const _DeviceInfo(deviceName: 'Linux Device', platform: 'linux');
+      }
+      if (Platform.isMacOS) {
+        final info = await plugin.macOsInfo;
+        return _DeviceInfo(
+          deviceName: info.model,
+          platform: 'macos',
+        );
+      }
+      if (Platform.isWindows) {
+        return const _DeviceInfo(
+          deviceName: 'Windows Device',
+          platform: 'windows',
+        );
+      }
+    } catch (_) {
+      // Fall through to unknown.
+    }
+    return const _DeviceInfo(deviceName: 'Unknown Device', platform: 'unknown');
+  }
+
+  // ── Internal helpers ─────────────────────────────────────────────────────
+
+  /// Exposed for unit testing only.
+  static String generateUuidV4ForTesting() => _generateUuidV4();
+
+  /// Generates a UUID v4 using a cryptographically secure random source.
+  static String _generateUuidV4() {
+    final rng = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
+
+    // Set version bits (version 4)
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    // Set variant bits (variant 1)
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    final hex =
+        bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-'
+        '${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-'
+        '${hex.substring(20)}';
+  }
+}
+
+/// Minimal device metadata collected for the policy-check request.
+class _DeviceInfo {
+  final String deviceName;
+  final String platform;
+
+  const _DeviceInfo({required this.deviceName, required this.platform});
+}

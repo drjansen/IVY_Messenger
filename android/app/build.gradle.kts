@@ -36,8 +36,8 @@ android {
         applicationId = "app.icsportals.ics_messenger_app"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
-        versionCode = 23
-        versionName = "6.6"
+        versionCode = 24
+        versionName = "6.7"
     }
 
     signingConfigs {

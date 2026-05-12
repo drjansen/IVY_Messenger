@@ -51,7 +51,7 @@ class DevicePolicyService {
   static const _policyBaseUrl = 'https://apppolicy.icsportals.org';
 
   /// The path of the device-policy check endpoint.
-  static const _checkPath = '/api/v1/device-check';
+  static const _checkPath = '/session/register';
 
   /// Pre-shared API key sent in the `X-App-Policy-Key` request header.
   ///
@@ -59,7 +59,7 @@ class DevicePolicyService {
   /// header before forwarding any request.  Because this is an internal,
   /// closed-distribution app the key is embedded here; treat it as you would
   /// any low-privilege service credential (rotate on compromise).
-  static const _policyApiKey = 'ics-app-policy-key-2025';
+  static const _policyApiKey = 'cd1fb10a79134e4d50f1da91f0bf1eb7e49deb6403b1be59116aca0e28fe3e15';
 
   // ── App metadata ─────────────────────────────────────────────────────────
 

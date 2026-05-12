@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:easy_localization/easy_localization.dart';
 
+import 'device_policy_service.dart';
 import 'matrix_service.dart';
 import 'main_screen.dart';
 import 'session_manager.dart';
@@ -93,6 +94,53 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _finishSuccessfulLogin(String username) async {
+    // ── Device-policy check ──────────────────────────────────────────────
+    // Enforce the one-device-per-user policy before completing login.
+    // The check is performed *after* Rocket.Chat authentication so that the
+    // user_id returned by the server can be included in the policy request.
+    setState(() => loading = true);
+
+    // Guard: userId must be populated by a successful login before reaching here.
+    final userId = MatrixService.userId;
+    if (userId.isEmpty) {
+      await MatrixService.clearSession();
+      setState(() {
+        loading = false;
+        error = tr('device_policy_error');
+      });
+      return;
+    }
+
+    final policyResult = await DevicePolicyService.checkDevicePolicy(
+      userId: userId,
+      username: username,
+    );
+
+    if (!mounted) return;
+
+    if (policyResult == DevicePolicyResult.denied) {
+      // A different device is already registered for this account.  Block
+      // the login and show a clear, user-facing explanation.
+      await MatrixService.clearSession();
+      setState(() {
+        loading = false;
+        error = tr('device_policy_denied');
+      });
+      return;
+    }
+
+    if (policyResult == DevicePolicyResult.error) {
+      // The policy service could not be reached.  For security (fail-closed),
+      // block the login rather than silently allowing an unverified device.
+      await MatrixService.clearSession();
+      setState(() {
+        loading = false;
+        error = tr('device_policy_error');
+      });
+      return;
+    }
+
+    // policyResult == DevicePolicyResult.allowed – continue normal flow.
     await _saveCredentials();
     await FirebaseMessaging.instance
         .requestPermission(alert: true, badge: true, sound: true);

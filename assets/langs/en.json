@@ -165,6 +165,5 @@
   "dashboard_lunch_failed": "Failed to load lunch menu.",
   "dashboard_lunch_none": "Today's lunch menu will be posted soon. Please check back a bit later 🙂",
 
-  "device_policy_denied": "⛔ Access denied: this account is registered to a different device. Please contact the ICS office if you believe this is an error.",
   "device_policy_error": "⚠️ Could not verify device registration. Please check your connection and try again."
 }

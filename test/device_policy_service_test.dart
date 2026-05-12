@@ -16,7 +16,7 @@ void main() {
 
     test('generateUuidV4ForTesting produces unique values', () {
       final ids = {
-        for (var _ in List.filled(20, 0)) DevicePolicyService.generateUuidV4ForTesting()
+        for (var i = 0; i < 20; i++) DevicePolicyService.generateUuidV4ForTesting()
       };
       // All 20 generated IDs should be unique.
       expect(ids.length, 20);

@@ -100,8 +100,19 @@ class _LoginScreenState extends State<LoginScreen> {
     // user_id returned by the server can be included in the policy request.
     setState(() => loading = true);
 
+    // Guard: userId must be populated by a successful login before reaching here.
+    final userId = MatrixService.userId;
+    if (userId.isEmpty) {
+      await MatrixService.clearSession();
+      setState(() {
+        loading = false;
+        error = tr('device_policy_error');
+      });
+      return;
+    }
+
     final policyResult = await DevicePolicyService.checkDevicePolicy(
-      userId: MatrixService.userId,
+      userId: userId,
       username: username,
     );
 

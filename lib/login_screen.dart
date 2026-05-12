@@ -95,9 +95,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _finishSuccessfulLogin(String username) async {
     // ── Device-policy check ──────────────────────────────────────────────
-    // Enforce the one-device-per-user policy before completing login.
-    // The check is performed *after* Rocket.Chat authentication so that the
-    // user_id returned by the server can be included in the policy request.
+    // Submit device information to the policy backend before completing login.
+    // The backend registers new devices and logs a multi_device_detected event
+    // (with an internal alert email) when a different device is seen — it no
+    // longer blocks access on mismatch.  A genuine server/transport error is
+    // still surfaced to the user.
     setState(() => loading = true);
 
     // Guard: userId must be populated by a successful login before reaching here.
@@ -117,17 +119,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (!mounted) return;
-
-    if (policyResult == DevicePolicyResult.denied) {
-      // A different device is already registered for this account.  Block
-      // the login and show a clear, user-facing explanation.
-      await MatrixService.clearSession();
-      setState(() {
-        loading = false;
-        error = tr('device_policy_denied');
-      });
-      return;
-    }
 
     if (policyResult == DevicePolicyResult.error) {
       // The policy service could not be reached.  For security (fail-closed),

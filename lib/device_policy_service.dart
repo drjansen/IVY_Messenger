@@ -9,13 +9,9 @@ import 'package:http/http.dart' as http;
 
 /// Result of a device-policy check call to the policy backend.
 enum DevicePolicyResult {
-  /// The backend recognised this device and/or registered it as the user's
-  /// first device.  Login may proceed normally.
+  /// The backend registered or recognised this device and/or recorded a
+  /// multi-device event for internal monitoring.  Login may proceed normally.
   allowed,
-
-  /// The backend rejected this device because a *different* device is already
-  /// registered for the user.  Login must be blocked.
-  denied,
 
   /// The policy check could not be completed (network error, server error, …).
   /// Callers may choose to block or allow depending on their fail-open/fail-closed
@@ -23,7 +19,13 @@ enum DevicePolicyResult {
   error,
 }
 
-/// Integrates with the ICS one-device-per-user policy backend.
+/// Integrates with the ICS messenger-app policy backend.
+///
+/// The backend registers the first device seen for each user and, on a
+/// subsequent login from a different device, logs a `multi_device_detected`
+/// event and sends an internal alert email — it no longer blocks access.
+/// This class always submits device information to the backend so that
+/// monitoring data remains accurate.
 ///
 /// ## What data is collected
 /// Only the minimum set required by the policy backend:
@@ -75,15 +77,16 @@ class DevicePolicyService {
 
   // ── Public API ───────────────────────────────────────────────────────────
 
-  /// Checks the one-device-per-user policy for the authenticated user.
+  /// Checks the device-policy endpoint for the authenticated user.
   ///
   /// Must be called **after** a successful Rocket.Chat login so that
   /// [userId] and [username] are available.
   ///
-  /// Returns:
-  /// - [DevicePolicyResult.allowed]  → login flow may continue
-  /// - [DevicePolicyResult.denied]   → a different device is registered; block login
-  /// - [DevicePolicyResult.error]    → policy service unreachable; caller decides
+  /// The backend now always allows login: on a first-seen device it registers
+  /// the device, and on a mismatch it records a `multi_device_detected` event
+  /// and sends an internal alert.  This method therefore returns:
+  /// - [DevicePolicyResult.allowed]  → backend responded with 200; continue login
+  /// - [DevicePolicyResult.error]    → transport/server error; caller decides
   static Future<DevicePolicyResult> checkDevicePolicy({
     required String userId,
     required String username,
@@ -116,12 +119,7 @@ class DevicePolicyService {
         return DevicePolicyResult.allowed;
       }
 
-      // 403 Forbidden / 409 Conflict both mean a *different* device is registered.
-      if (resp.statusCode == 403 || resp.statusCode == 409) {
-        return DevicePolicyResult.denied;
-      }
-
-      // Any other non-200 status is an unexpected server error.
+      // Any non-200 status indicates an unexpected server or configuration error.
       assert(() {
         // ignore: avoid_print
         print('⚠️ DevicePolicyService: unexpected status ${resp.statusCode}');

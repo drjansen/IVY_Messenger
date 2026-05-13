@@ -34,17 +34,8 @@ class PasswordResetUnavailableBackend extends PasswordResetRequestBackend {
 
   @override
   Future<PasswordResetRequestResult> requestPasswordReset(String email) async {
-    try {
-      // Placeholder backend for upcoming in-app reset code integration.
-      // Intentionally avoids any direct Rocket.Chat forgot-password API call.
-      return PasswordResetRequestResult.unavailable;
-    } catch (e) {
-      assert(() {
-        // ignore: avoid_print
-        print('⚠️ PasswordResetService: request failed: $e');
-        return true;
-      }());
-      return PasswordResetRequestResult.failure;
-    }
+    // Placeholder backend for upcoming in-app reset code integration.
+    // Intentionally avoids any direct Rocket.Chat forgot-password API call.
+    return PasswordResetRequestResult.unavailable;
   }
 }

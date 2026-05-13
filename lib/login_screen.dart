@@ -28,6 +28,13 @@ class _LoginScreenState extends State<LoginScreen> {
   String? currentLocale;
 
   @override
+  void dispose() {
+    usernameController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
     _loadSavedCredentials();
@@ -190,95 +197,29 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showForgotPasswordDialog() async {
-    final rootContext = context;
-    final emailController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    var submitting = false;
-    try {
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) {
-          return StatefulBuilder(
-            builder: (_, setDialogState) {
-              return AlertDialog(
-                title: Text('forgot_password'.tr()),
-                content: Form(
-                  key: formKey,
-                  child: TextFormField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.email],
-                    decoration: InputDecoration(
-                      labelText: 'forgot_password_email_label'.tr(),
-                    ),
-                    validator: (value) {
-                      final raw = value ?? '';
-                      if (raw.trim().isEmpty) {
-                        return 'forgot_password_email_required'.tr();
-                      }
-                      if (!_isReasonablyValidEmail(raw)) {
-                        return 'forgot_password_invalid_email'.tr();
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: submitting ? null : () => Navigator.pop(dialogContext),
-                    child: Text('cancel'.tr()),
-                  ),
-                  ElevatedButton(
-                    onPressed: submitting
-                        ? null
-                        : () async {
-                            final isValid = formKey.currentState?.validate() ?? false;
-                            if (!isValid) return;
+    final result = await showDialog<PasswordResetRequestResult>(
+      context: context,
+      builder: (_) => _ForgotPasswordDialog(
+        isReasonablyValidEmail: _isReasonablyValidEmail,
+      ),
+    );
+    if (!mounted || result == null) return;
 
-                            setDialogState(() => submitting = true);
-                            final result =
-                                await PasswordResetService.requestPasswordReset(
-                                  emailController.text,
-                                );
-                            if (!mounted) return;
-                            if (dialogContext.mounted &&
-                                Navigator.of(dialogContext).canPop()) {
-                              Navigator.pop(dialogContext);
-                            }
-
-                            final messenger = ScaffoldMessenger.of(rootContext);
-                            if (result == PasswordResetRequestResult.success) {
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'forgot_password_neutral_success_message'.tr(),
-                                  ),
-                                ),
-                              );
-                            } else {
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text('forgot_password_request_failed'.tr()),
-                                ),
-                              );
-                            }
-                          },
-                    child: submitting
-                        ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text('forgot_password_send_reset'.tr()),
-                  ),
-                ],
-              );
-            },
-          );
-        },
+    final messenger = ScaffoldMessenger.of(context);
+    if (result == PasswordResetRequestResult.success) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'forgot_password_neutral_success_message'.tr(),
+          ),
+        ),
       );
-    } finally {
-      emailController.dispose();
+    } else {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('forgot_password_request_failed'.tr()),
+        ),
+      );
     }
   }
 
@@ -376,6 +317,85 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  final bool Function(String value) isReasonablyValidEmail;
+
+  const _ForgotPasswordDialog({
+    required this.isReasonablyValidEmail,
+  });
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final isValid = _formKey.currentState?.validate() ?? false;
+    if (!isValid || _submitting) return;
+
+    setState(() => _submitting = true);
+    final result = await PasswordResetService.requestPasswordReset(
+      _emailController.text,
+    );
+    if (!mounted) return;
+    Navigator.of(context).pop(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('forgot_password'.tr()),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email],
+          decoration: InputDecoration(
+            labelText: 'forgot_password_email_label'.tr(),
+          ),
+          validator: (value) {
+            final raw = value ?? '';
+            if (raw.trim().isEmpty) {
+              return 'forgot_password_email_required'.tr();
+            }
+            if (!widget.isReasonablyValidEmail(raw)) {
+              return 'forgot_password_invalid_email'.tr();
+            }
+            return null;
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          child: Text('cancel'.tr()),
+        ),
+        ElevatedButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text('forgot_password_send_reset'.tr()),
+        ),
+      ],
     );
   }
 }

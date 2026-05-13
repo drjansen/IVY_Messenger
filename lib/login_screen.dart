@@ -325,8 +325,9 @@ class _ForgotPasswordDialog extends StatefulWidget {
   final bool Function(String value) isReasonablyValidEmail;
 
   const _ForgotPasswordDialog({
+    Key? key,
     required this.isReasonablyValidEmail,
-  });
+  }) : super(key: key);
 
   @override
   State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();

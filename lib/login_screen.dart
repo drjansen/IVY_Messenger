@@ -7,6 +7,7 @@ import 'device_policy_service.dart';
 import 'matrix_service.dart';
 import 'main_screen.dart';
 import 'password_reset_service.dart';
+import 'password_policy_validator.dart';
 import 'session_manager.dart';
 import 'two_factor_screen.dart';
 
@@ -504,6 +505,7 @@ class _ForgotPasswordConfirmDialogState
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,15 +529,28 @@ class _ForgotPasswordConfirmDialogState
                 },
               ),
               const SizedBox(height: 8),
+              Text(
+                'forgot_password_password_policy_hint'.tr(),
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _newPasswordController,
                 obscureText: true,
                 decoration: InputDecoration(
                   labelText: 'forgot_password_new_password_label'.tr(),
                 ),
+                onChanged: (_) {
+                  if (_confirmPasswordController.text.isNotEmpty) {
+                    _formKey.currentState?.validate();
+                  }
+                },
                 validator: (value) {
-                  if ((value ?? '').isEmpty) {
-                    return 'forgot_password_new_password_required'.tr();
+                  final errorKey = PasswordPolicyValidator.validateResetPassword(
+                    value ?? '',
+                  );
+                  if (errorKey != null) {
+                    return errorKey.tr();
                   }
                   return null;
                 },

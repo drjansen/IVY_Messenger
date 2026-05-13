@@ -68,9 +68,12 @@ class PasswordResetService {
           )
           .timeout(const Duration(seconds: 15));
 
-      // Both 200 (account found) and 404 (no account) are treated as "sent"
-      // to prevent account-enumeration attacks.
-      if (resp.statusCode == 200 || resp.statusCode == 404) {
+      // Any 2xx response (account found/accepted) and 404 (no account) are
+      // treated as "sent" to prevent account-enumeration attacks.
+      // The backend may return 202 Accepted when the reset email is queued
+      // asynchronously, so all 2xx codes are valid success responses here.
+      if ((resp.statusCode >= 200 && resp.statusCode < 300) ||
+          resp.statusCode == 404) {
         return PasswordResetRequestResult.sent;
       }
 
@@ -122,7 +125,9 @@ class PasswordResetService {
           )
           .timeout(const Duration(seconds: 15));
 
-      if (resp.statusCode == 200) {
+      // Accept any 2xx response as success; the backend may return 200, 201,
+      // or 202 depending on whether the operation completed synchronously.
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
         return PasswordResetConfirmResult.success;
       }
 

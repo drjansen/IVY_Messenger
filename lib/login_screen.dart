@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'device_policy_service.dart';
 import 'matrix_service.dart';
 import 'main_screen.dart';
+import 'password_reset_service.dart';
 import 'session_manager.dart';
 import 'two_factor_screen.dart';
 
@@ -181,6 +182,106 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  bool _isReasonablyValidEmail(String value) {
+    final email = value.trim();
+    if (email.isEmpty) return false;
+    final pattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    return pattern.hasMatch(email);
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    final rootContext = context;
+    final emailController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    var submitting = false;
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (_, setDialogState) {
+              return AlertDialog(
+                title: Text('forgot_password'.tr()),
+                content: Form(
+                  key: formKey,
+                  child: TextFormField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    decoration: InputDecoration(
+                      labelText: 'forgot_password_email_label'.tr(),
+                    ),
+                    validator: (value) {
+                      final raw = value ?? '';
+                      if (raw.trim().isEmpty) {
+                        return 'forgot_password_email_required'.tr();
+                      }
+                      if (!_isReasonablyValidEmail(raw)) {
+                        return 'forgot_password_invalid_email'.tr();
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: submitting ? null : () => Navigator.pop(dialogContext),
+                    child: Text('cancel'.tr()),
+                  ),
+                  ElevatedButton(
+                    onPressed: submitting
+                        ? null
+                        : () async {
+                            final isValid = formKey.currentState?.validate() ?? false;
+                            if (!isValid) return;
+
+                            setDialogState(() => submitting = true);
+                            final result =
+                                await PasswordResetService.requestPasswordReset(
+                                  emailController.text,
+                                );
+                            if (!mounted) return;
+                            if (dialogContext.mounted &&
+                                Navigator.of(dialogContext).canPop()) {
+                              Navigator.pop(dialogContext);
+                            }
+
+                            final messenger = ScaffoldMessenger.of(rootContext);
+                            if (result == PasswordResetRequestResult.success) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'forgot_password_neutral_success_message'.tr(),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text('forgot_password_request_failed'.tr()),
+                                ),
+                              );
+                            }
+                          },
+                    child: submitting
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text('forgot_password_send_reset'.tr()),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      emailController.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -214,6 +315,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: passwordController,
                 decoration: InputDecoration(labelText: 'password'.tr()),
                 obscureText: true,
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: loading ? null : _showForgotPasswordDialog,
+                  child: Text('forgot_password'.tr()),
+                ),
               ),
               const SizedBox(height: 10),
 

@@ -368,7 +368,10 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('forgot_password_preparing_hint'.tr()),
+            Semantics(
+              label: 'forgot_password_preparing_hint'.tr(),
+              child: Text('forgot_password_preparing_hint'.tr()),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _emailController,

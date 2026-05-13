@@ -4,12 +4,8 @@ enum PasswordResetRequestResult {
 }
 
 class PasswordResetService {
-  static PasswordResetRequestBackend _backend =
-      const PasswordResetUnavailableBackend();
-
-  static void configureBackendForTesting(PasswordResetRequestBackend backend) {
-    _backend = backend;
-  }
+  static const PasswordResetRequestBackend _backend =
+      PasswordResetUnavailableBackend();
 
   static Future<PasswordResetRequestResult> requestPasswordReset(
     String email,

@@ -190,90 +190,95 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showForgotPasswordDialog() async {
+    final rootContext = context;
     final emailController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     var submitting = false;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (_, setDialogState) {
-            return AlertDialog(
-              title: Text('forgot_password'.tr()),
-              content: Form(
-                key: formKey,
-                child: TextFormField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                  decoration: InputDecoration(
-                    labelText: 'forgot_password_email_label'.tr(),
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (_, setDialogState) {
+              return AlertDialog(
+                title: Text('forgot_password'.tr()),
+                content: Form(
+                  key: formKey,
+                  child: TextFormField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    decoration: InputDecoration(
+                      labelText: 'forgot_password_email_label'.tr(),
+                    ),
+                    validator: (value) {
+                      final raw = value ?? '';
+                      if (raw.trim().isEmpty) {
+                        return 'forgot_password_email_required'.tr();
+                      }
+                      if (!_isReasonablyValidEmail(raw)) {
+                        return 'forgot_password_invalid_email'.tr();
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    final raw = value ?? '';
-                    if (raw.trim().isEmpty) {
-                      return 'forgot_password_email_required'.tr();
-                    }
-                    if (!_isReasonablyValidEmail(raw)) {
-                      return 'forgot_password_invalid_email'.tr();
-                    }
-                    return null;
-                  },
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: submitting ? null : () => Navigator.pop(dialogContext),
-                  child: Text('cancel'.tr()),
-                ),
-                ElevatedButton(
-                  onPressed: submitting
-                      ? null
-                      : () async {
-                          final isValid = formKey.currentState?.validate() ?? false;
-                          if (!isValid) return;
+                actions: [
+                  TextButton(
+                    onPressed: submitting ? null : () => Navigator.pop(dialogContext),
+                    child: Text('cancel'.tr()),
+                  ),
+                  ElevatedButton(
+                    onPressed: submitting
+                        ? null
+                        : () async {
+                            final isValid = formKey.currentState?.validate() ?? false;
+                            if (!isValid) return;
 
-                          setDialogState(() => submitting = true);
-                          final result = await PasswordResetService.requestPasswordReset(
-                            emailController.text,
-                          );
-                          if (!mounted) return;
-                          Navigator.pop(dialogContext);
+                            setDialogState(() => submitting = true);
+                            final result =
+                                await PasswordResetService.requestPasswordReset(
+                                  emailController.text,
+                                );
+                            if (!mounted) return;
+                            if (Navigator.of(dialogContext).canPop()) {
+                              Navigator.pop(dialogContext);
+                            }
 
-                          final messenger = ScaffoldMessenger.of(this.context);
-                          if (result == PasswordResetRequestResult.success) {
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'forgot_password_neutral_success_message'.tr(),
+                            final messenger = ScaffoldMessenger.of(rootContext);
+                            if (result == PasswordResetRequestResult.success) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'forgot_password_neutral_success_message'.tr(),
+                                  ),
                                 ),
-                              ),
-                            );
-                          } else {
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text('forgot_password_request_failed'.tr()),
-                              ),
-                            );
-                          }
-                        },
-                  child: submitting
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text('forgot_password_send_reset'.tr()),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    emailController.dispose();
+                              );
+                            } else {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text('forgot_password_request_failed'.tr()),
+                                ),
+                              );
+                            }
+                          },
+                    child: submitting
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text('forgot_password_send_reset'.tr()),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      emailController.dispose();
+    }
   }
 
   @override

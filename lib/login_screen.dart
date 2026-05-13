@@ -369,7 +369,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Semantics(
-              label: 'forgot_password_preparing_hint'.tr(),
+              container: true,
               child: Text('forgot_password_preparing_hint'.tr()),
             ),
             const SizedBox(height: 12),

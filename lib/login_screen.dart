@@ -44,6 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadSavedCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUsername = prefs.getString('saved_username');
+    if (!mounted) return;
 
     if (savedUsername != null) {
       setState(() {
@@ -77,6 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final username = usernameController.text.trim();
     final password = passwordController.text;
     final result = await MatrixService.login(username, password);
+    if (!mounted) return;
 
     setState(() => loading = false);
 
@@ -167,6 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadSavedLocale() async {
     final prefs = await SharedPreferences.getInstance();
     final savedLocale = prefs.getString('user_locale');
+    if (!mounted) return;
     if (savedLocale != null && savedLocale.isNotEmpty) {
       context.setLocale(Locale(savedLocale));
       setState(() {
@@ -183,6 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final prefs = await SharedPreferences.getInstance();
     final newLocale = context.locale.languageCode == 'en' ? 'ko' : 'en';
     await prefs.setString('user_locale', newLocale);
+    if (!mounted) return;
     context.setLocale(Locale(newLocale));
     setState(() {
       currentLocale = newLocale;
@@ -206,11 +210,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted || result == null) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    if (result == PasswordResetRequestResult.success) {
+    if (result == PasswordResetRequestResult.unavailable) {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'forgot_password_neutral_success_message'.tr(),
+            'forgot_password_temporarily_unavailable_message'.tr(),
           ),
         ),
       );
@@ -361,23 +365,30 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
       title: Text('forgot_password'.tr()),
       content: Form(
         key: _formKey,
-        child: TextFormField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          autofillHints: const [AutofillHints.email],
-          decoration: InputDecoration(
-            labelText: 'forgot_password_email_label'.tr(),
-          ),
-          validator: (value) {
-            final raw = value ?? '';
-            if (raw.trim().isEmpty) {
-              return 'forgot_password_email_required'.tr();
-            }
-            if (!widget.isReasonablyValidEmail(raw)) {
-              return 'forgot_password_invalid_email'.tr();
-            }
-            return null;
-          },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('forgot_password_preparing_hint'.tr()),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              decoration: InputDecoration(
+                labelText: 'forgot_password_email_label'.tr(),
+              ),
+              validator: (value) {
+                final raw = value ?? '';
+                if (raw.trim().isEmpty) {
+                  return 'forgot_password_email_required'.tr();
+                }
+                if (!widget.isReasonablyValidEmail(raw)) {
+                  return 'forgot_password_invalid_email'.tr();
+                }
+                return null;
+              },
+            ),
+          ],
         ),
       ),
       actions: [
@@ -393,7 +404,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                   width: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Text('forgot_password_send_reset'.tr()),
+              : Text('forgot_password_submit'.tr()),
         ),
       ],
     );

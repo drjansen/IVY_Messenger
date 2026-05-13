@@ -201,30 +201,37 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _showForgotPasswordDialog() async {
-    final result = await showDialog<PasswordResetRequestResult>(
+    // ── Step 1: collect email and request reset code ──────────────────────
+    final email = await showDialog<String>(
       context: context,
-      builder: (_) => _ForgotPasswordDialog(
+      barrierDismissible: false,
+      builder: (_) => _ForgotPasswordRequestDialog(
         isReasonablyValidEmail: _isReasonablyValidEmail,
       ),
     );
-    if (!mounted || result == null) return;
+    // null → user cancelled
+    if (!mounted || email == null) return;
 
-    final messenger = ScaffoldMessenger.of(context);
-    if (result == PasswordResetRequestResult.unavailable) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'forgot_password_temporarily_unavailable_message'.tr(),
-          ),
-        ),
-      );
-    } else {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('forgot_password_request_failed'.tr()),
-        ),
+    // Neutral confirmation: avoid leaking whether the account exists.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('forgot_password_code_sent'.tr())),
+    );
+
+    // ── Step 2: enter reset code + new password ───────────────────────────
+    final confirmResult = await showDialog<PasswordResetConfirmResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _ForgotPasswordConfirmDialog(email: email),
+    );
+    if (!mounted) return;
+
+    if (confirmResult == PasswordResetConfirmResult.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('forgot_password_reset_success'.tr())),
       );
     }
+    // Failure is surfaced inside _ForgotPasswordConfirmDialog; null means
+    // the user cancelled, in which case no top-level message is needed.
   }
 
   @override
@@ -325,21 +332,26 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _ForgotPasswordDialog extends StatefulWidget {
+// ── Step-1 dialog: enter email and request a reset code ──────────────────────
+
+class _ForgotPasswordRequestDialog extends StatefulWidget {
   final bool Function(String value) isReasonablyValidEmail;
 
-  const _ForgotPasswordDialog({
+  const _ForgotPasswordRequestDialog({
     required this.isReasonablyValidEmail,
   });
 
   @override
-  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+  State<_ForgotPasswordRequestDialog> createState() =>
+      _ForgotPasswordRequestDialogState();
 }
 
-class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+class _ForgotPasswordRequestDialogState
+    extends State<_ForgotPasswordRequestDialog> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _submitting = false;
+  String _error = '';
 
   @override
   void dispose() {
@@ -351,12 +363,24 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid || _submitting) return;
 
-    setState(() => _submitting = true);
-    final result = await PasswordResetService.requestPasswordReset(
-      _emailController.text,
-    );
+    setState(() {
+      _submitting = true;
+      _error = '';
+    });
+
+    final email = _emailController.text.trim();
+    final result = await PasswordResetService.requestPasswordReset(email);
     if (!mounted) return;
-    Navigator.of(context).pop(result);
+
+    if (result == PasswordResetRequestResult.sent) {
+      // Pop and return the email so step 2 can pre-fill it.
+      Navigator.of(context).pop(email);
+    } else {
+      setState(() {
+        _submitting = false;
+        _error = 'forgot_password_request_failed'.tr();
+      });
+    }
   }
 
   @override
@@ -368,7 +392,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('forgot_password_preparing_hint'.tr()),
+            Text('forgot_password_email_hint'.tr()),
             const SizedBox(height: 12),
             TextFormField(
               controller: _emailController,
@@ -388,6 +412,13 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                 return null;
               },
             ),
+            if (_error.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+              ),
+            ],
           ],
         ),
       ),
@@ -405,6 +436,152 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : Text('forgot_password_submit'.tr()),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Step-2 dialog: enter reset code + new password ────────────────────────────
+
+class _ForgotPasswordConfirmDialog extends StatefulWidget {
+  final String email;
+
+  const _ForgotPasswordConfirmDialog({required this.email});
+
+  @override
+  State<_ForgotPasswordConfirmDialog> createState() =>
+      _ForgotPasswordConfirmDialogState();
+}
+
+class _ForgotPasswordConfirmDialogState
+    extends State<_ForgotPasswordConfirmDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _codeController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _submitting = false;
+  String _error = '';
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final isValid = _formKey.currentState?.validate() ?? false;
+    if (!isValid || _submitting) return;
+
+    setState(() {
+      _submitting = true;
+      _error = '';
+    });
+
+    final result = await PasswordResetService.confirmPasswordReset(
+      email: widget.email,
+      code: _codeController.text,
+      newPassword: _newPasswordController.text,
+    );
+    if (!mounted) return;
+
+    if (result == PasswordResetConfirmResult.success) {
+      Navigator.of(context).pop(result);
+    } else {
+      setState(() {
+        _submitting = false;
+        _error = 'forgot_password_reset_failed'.tr();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('forgot_password_confirm_title'.tr()),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'forgot_password_code_sent_to'.tr(args: [widget.email]),
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _codeController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'forgot_password_code_label'.tr(),
+                ),
+                validator: (value) {
+                  if ((value ?? '').trim().isEmpty) {
+                    return 'forgot_password_code_required'.tr();
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _newPasswordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'forgot_password_new_password_label'.tr(),
+                ),
+                validator: (value) {
+                  if ((value ?? '').isEmpty) {
+                    return 'forgot_password_new_password_required'.tr();
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'forgot_password_confirm_password_label'.tr(),
+                ),
+                validator: (value) {
+                  if ((value ?? '').isEmpty) {
+                    return 'forgot_password_confirm_password_required'.tr();
+                  }
+                  if (value != _newPasswordController.text) {
+                    return 'forgot_password_passwords_mismatch'.tr();
+                  }
+                  return null;
+                },
+              ),
+              if (_error.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _error,
+                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+          child: Text('cancel'.tr()),
+        ),
+        ElevatedButton(
+          onPressed: _submitting ? null : _submit,
+          child: _submitting
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text('forgot_password_confirm_submit'.tr()),
         ),
       ],
     );

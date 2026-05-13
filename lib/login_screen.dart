@@ -241,7 +241,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   emailController.text,
                                 );
                             if (!mounted) return;
-                            if (Navigator.of(dialogContext).canPop()) {
+                            if (dialogContext.mounted &&
+                                Navigator.of(dialogContext).canPop()) {
                               Navigator.pop(dialogContext);
                             }
 

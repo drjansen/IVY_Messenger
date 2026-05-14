@@ -119,7 +119,7 @@ class PasswordResetService {
             headers: _headers,
             body: jsonEncode({
               'email': normalizedEmail,
-              'code': trimmedCode,
+              'reset_code': trimmedCode,
               'new_password': newPassword,
             }),
           )

@@ -36,8 +36,8 @@ class MatrixLoginResult {
 
 class MatrixService {
   static const _baseUrl = 'https://app.icsportals.org';
-  static String _authToken = '';
-  static String _userId = '';
+  static late String _authToken;
+  static late String _userId;
 
   static String get rocketchatAuthToken => _authToken;
   static String get rocketchatUserId => _userId;
@@ -54,6 +54,7 @@ class MatrixService {
   // --- Rate limit state (messages) ---
   static DateTime? _messagesRateLimitedUntil;
   static bool _revokedSessionHandled = false;
+  static Future<void>? _revokedSessionLogoutFuture;
   static final ValueNotifier<String?> authEventNoticeKey =
       ValueNotifier<String?>(null);
 
@@ -97,10 +98,22 @@ class MatrixService {
 
   static bool _matchesRevokedCode(String? value) {
     if (value == null || value.trim().isEmpty) return false;
-    final normalized = value.trim().toUpperCase();
-    return normalized.contains('SESSION_REVOKED') ||
-        normalized.contains('LOGGED_IN_ON_ANOTHER_DEVICE') ||
-        normalized.contains('SESSION_SUPERSEDED');
+    final normalized = value.trim().toUpperCase().replaceAll('-', '_');
+    const revokedCodes = <String>{
+      'SESSION_REVOKED',
+      'LOGGED_IN_ON_ANOTHER_DEVICE',
+      'SESSION_SUPERSEDED',
+    };
+    for (final code in revokedCodes) {
+      if (normalized == code ||
+          normalized.startsWith('$code:') ||
+          normalized.startsWith('$code ') ||
+          normalized.startsWith('${code}_') ||
+          normalized.startsWith('$code-')) {
+        return true;
+      }
+    }
+    return false;
   }
 
   static bool _isRevokedSessionResponse(int statusCode, String? body) {
@@ -124,12 +137,33 @@ class MatrixService {
     }
   }
 
-  static Future<void> _enforceRevokedSessionLogout() async {
-    if (_revokedSessionHandled) return;
+  static Future<void> _runRevokedSessionLogout() async {
     _revokedSessionHandled = true;
     await clearSession();
     await SessionManager.clearSession();
     authEventNoticeKey.value = 'session_revoked_notice';
+  }
+
+  static Future<void> forceLogoutForRevokedSession() async {
+    await _enforceRevokedSessionLogout();
+  }
+
+  static Future<void> _enforceRevokedSessionLogout() async {
+    if (_revokedSessionHandled) return;
+    if (_revokedSessionLogoutFuture != null) {
+      await _revokedSessionLogoutFuture;
+      return;
+    }
+    final pending = _runRevokedSessionLogout();
+    _revokedSessionLogoutFuture = pending;
+    try {
+      await pending;
+    } finally {
+      // Only clear the same in-flight future instance created above.
+      if (identical(_revokedSessionLogoutFuture, pending)) {
+        _revokedSessionLogoutFuture = null;
+      }
+    }
   }
 
   static Future<void> handlePotentialRevokedSessionResponse(
@@ -148,6 +182,12 @@ class MatrixService {
       await _enforceRevokedSessionLogout();
     }
   }
+
+  static bool looksLikeRevokedSessionStatus(
+    int statusCode, {
+    String? responseBody,
+  }) =>
+      _isRevokedSessionResponse(statusCode, responseBody);
 
   /// Exposed for unit testing only.
   static bool isRevokedSessionResponseForTesting({
@@ -584,6 +624,7 @@ class MatrixService {
       _authToken = authToken;
       _userId = userId;
       _revokedSessionHandled = false;
+      _revokedSessionLogoutFuture = null;
       authEventNoticeKey.value = null;
 
       _avatarCache.clear();
@@ -1471,7 +1512,11 @@ class MatrixService {
   /// Validates a restored session at startup to avoid entering a broken
   /// authenticated state with stale local tokens.
   static Future<bool> validateRestoredSession() async {
-    if (_authToken.isEmpty || _userId.isEmpty) return false;
+    try {
+      if (_authToken.isEmpty || _userId.isEmpty) return false;
+    } catch (_) {
+      return false;
+    }
     try {
       final resp = await _authedGet(Uri.parse('$_baseUrl/api/v1/me'));
       if (resp.statusCode == 200) return true;
@@ -1483,6 +1528,11 @@ class MatrixService {
       return true;
     } catch (_) {
       // Connectivity issues should not force a logout.
+      assert(() {
+        // ignore: avoid_print
+        print('⚠️ validateRestoredSession: unable to verify session online');
+        return true;
+      }());
       return true;
     }
   }

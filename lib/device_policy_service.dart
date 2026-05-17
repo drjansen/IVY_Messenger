@@ -6,6 +6,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'matrix_service.dart';
 
 /// Result of a device-policy check call to the policy backend.
 enum DevicePolicyResult {
@@ -24,9 +25,10 @@ enum DevicePolicyResult {
 
 /// Integrates with the ICS messenger-app policy backend.
 ///
-/// The backend enforces a single active device session per user. This class
-/// submits device information and interprets explicit revocation responses so
-/// the UI can force local logout when a newer login supersedes this session.
+/// The backend tracks single-device session ownership and signals explicit
+/// revocation responses when a newer login supersedes this session. This class
+/// submits device information and interprets those revocation responses so the
+/// UI can force local logout.
 ///
 /// ## What data is collected
 /// Only the minimum set required by the policy backend:
@@ -120,7 +122,10 @@ class DevicePolicyService {
       }
 
       if ((resp.statusCode == 401 || resp.statusCode == 403) &&
-          _looksLikeRevokedSessionResponse(resp.body)) {
+          MatrixService.looksLikeRevokedSessionStatus(
+            resp.statusCode,
+            responseBody: resp.body,
+          )) {
         return DevicePolicyResult.revoked;
       }
 
@@ -138,32 +143,6 @@ class DevicePolicyService {
         return true;
       }());
       return DevicePolicyResult.error;
-    }
-  }
-
-  static bool _looksLikeRevokedSessionResponse(String body) {
-    try {
-      final decoded = jsonDecode(body);
-      if (decoded is! Map) return false;
-      final values = <String?>[
-        decoded['code']?.toString(),
-        decoded['errorCode']?.toString(),
-        decoded['error']?.toString(),
-        decoded['detail']?.toString(),
-        decoded['message']?.toString(),
-      ];
-      for (final raw in values) {
-        if (raw == null) continue;
-        final v = raw.toUpperCase();
-        if (v.contains('SESSION_REVOKED') ||
-            v.contains('LOGGED_IN_ON_ANOTHER_DEVICE') ||
-            v.contains('SESSION_SUPERSEDED')) {
-          return true;
-        }
-      }
-      return false;
-    } catch (_) {
-      return false;
     }
   }
 

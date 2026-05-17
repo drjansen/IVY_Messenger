@@ -121,8 +121,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _finishSuccessfulLogin(String username) async {
     // ── Device-policy check ──────────────────────────────────────────────
     // Submit device information to the policy backend before completing login.
-    // The backend enforces an exclusive single-device session and may reject
-    // this session if it has already been superseded by a newer login.
+    // The backend tracks exclusive-session state and can signal when this
+    // session has already been superseded by a newer login on another device.
     setState(() => loading = true);
 
     // Guard: userId must be populated by a successful login before reaching here.
@@ -155,8 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (policyResult == DevicePolicyResult.revoked) {
-      await MatrixService.clearSession();
-      await SessionManager.clearSession();
+      await MatrixService.forceLogoutForRevokedSession();
       setState(() {
         loading = false;
         sessionNoticeKey = 'session_revoked_notice';

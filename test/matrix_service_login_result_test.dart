@@ -102,4 +102,10 @@ void main() {
       expect(detected, isFalse);
     });
   });
+
+  test('clearAuthEventNotice clears any pending auth event notice', () {
+    MatrixService.authEventNoticeKey.value = 'session_revoked_notice';
+    MatrixService.clearAuthEventNotice();
+    expect(MatrixService.authEventNoticeKey.value, isNull);
+  });
 }

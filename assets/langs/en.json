@@ -192,5 +192,6 @@
   "dashboard_lunch_failed": "Failed to load lunch menu.",
   "dashboard_lunch_none": "Today's lunch menu will be posted soon. Please check back a bit later 🙂",
 
-  "device_policy_error": "⚠️ Could not verify device registration. Please check your connection and try again."
+  "device_policy_error": "⚠️ Could not verify device registration. Please check your connection and try again.",
+  "session_revoked_notice": "You were signed out because your account was logged in on another device."
 }

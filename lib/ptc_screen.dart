@@ -137,6 +137,7 @@ class _PtcScreenState extends State<PtcScreen> {
   Future<void> _fetchActiveDay() async {
     final uri = Uri.parse('$_ptcBaseUrl/api/ptc/active-day');
     final resp = await http.get(uri, headers: _ptcHeaders);
+    await MatrixService.handlePotentialRevokedSessionResponse(resp);
 
     if (resp.statusCode == 401) {
       throw Exception('ptc_unauthorized'.tr());
@@ -169,6 +170,7 @@ class _PtcScreenState extends State<PtcScreen> {
     final date = (_ptcDate ?? '').trim();
     final uri = Uri.parse('$_ptcBaseUrl/api/ptc/dashboard${date.isNotEmpty ? '?date=$date' : ''}');
     final resp = await http.get(uri, headers: _ptcHeaders);
+    await MatrixService.handlePotentialRevokedSessionResponse(resp);
 
     if (resp.statusCode == 401) {
       throw Exception('ptc_unauthorized'.tr());
@@ -262,6 +264,7 @@ class _PtcScreenState extends State<PtcScreen> {
         headers: _ptcHeaders,
         body: jsonEncode({'child_id': childId, 'level': level}),
       );
+      await MatrixService.handlePotentialRevokedSessionResponse(resp);
 
       if (resp.statusCode == 401) throw Exception('ptc_unauthorized'.tr());
       if (resp.statusCode != 200) {
@@ -317,6 +320,7 @@ class _PtcScreenState extends State<PtcScreen> {
           'needs_translator': needsTranslator,
         }),
       );
+      await MatrixService.handlePotentialRevokedSessionResponse(resp);
 
       if (resp.statusCode == 401) throw Exception('ptc_unauthorized'.tr());
       if (resp.statusCode != 200) {

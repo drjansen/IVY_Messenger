@@ -74,6 +74,7 @@ class UserNameCache {
         'X-Auth-Token': authToken,
         'X-User-Id': userId,
       });
+      await MatrixService.handlePotentialRevokedSessionResponse(resp);
 
       if (resp.statusCode == 429) {
         if (kDebugMode) {

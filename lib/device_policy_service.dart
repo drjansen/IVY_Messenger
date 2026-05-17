@@ -17,15 +17,16 @@ enum DevicePolicyResult {
   /// Callers may choose to block or allow depending on their fail-open/fail-closed
   /// preference; the UI layer is responsible for presenting an appropriate message.
   error,
+
+  /// The backend indicates this session was revoked/superseded by another login.
+  revoked,
 }
 
 /// Integrates with the ICS messenger-app policy backend.
 ///
-/// The backend registers the first device seen for each user and, on a
-/// subsequent login from a different device, logs a `multi_device_detected`
-/// event and sends an internal alert email — it no longer blocks access.
-/// This class always submits device information to the backend so that
-/// monitoring data remains accurate.
+/// The backend enforces a single active device session per user. This class
+/// submits device information and interprets explicit revocation responses so
+/// the UI can force local logout when a newer login supersedes this session.
 ///
 /// ## What data is collected
 /// Only the minimum set required by the policy backend:
@@ -82,10 +83,9 @@ class DevicePolicyService {
   /// Must be called **after** a successful Rocket.Chat login so that
   /// [userId] and [username] are available.
   ///
-  /// The backend now always allows login: on a first-seen device it registers
-  /// the device, and on a mismatch it records a `multi_device_detected` event
-  /// and sends an internal alert.  This method therefore returns:
-  /// - [DevicePolicyResult.allowed]  → backend responded with 200; continue login
+  /// Returns:
+  /// - [DevicePolicyResult.allowed]  → backend accepted the current session
+  /// - [DevicePolicyResult.revoked]  → backend reports this session is superseded
   /// - [DevicePolicyResult.error]    → transport/server error; caller decides
   static Future<DevicePolicyResult> checkDevicePolicy({
     required String userId,
@@ -119,6 +119,11 @@ class DevicePolicyService {
         return DevicePolicyResult.allowed;
       }
 
+      if ((resp.statusCode == 401 || resp.statusCode == 403) &&
+          _looksLikeRevokedSessionResponse(resp.body)) {
+        return DevicePolicyResult.revoked;
+      }
+
       // Any non-200 status indicates an unexpected server or configuration error.
       assert(() {
         // ignore: avoid_print
@@ -133,6 +138,32 @@ class DevicePolicyService {
         return true;
       }());
       return DevicePolicyResult.error;
+    }
+  }
+
+  static bool _looksLikeRevokedSessionResponse(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return false;
+      final values = <String?>[
+        decoded['code']?.toString(),
+        decoded['errorCode']?.toString(),
+        decoded['error']?.toString(),
+        decoded['detail']?.toString(),
+        decoded['message']?.toString(),
+      ];
+      for (final raw in values) {
+        if (raw == null) continue;
+        final v = raw.toUpperCase();
+        if (v.contains('SESSION_REVOKED') ||
+            v.contains('LOGGED_IN_ON_ANOTHER_DEVICE') ||
+            v.contains('SESSION_SUPERSEDED')) {
+          return true;
+        }
+      }
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 

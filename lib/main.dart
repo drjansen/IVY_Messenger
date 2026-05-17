@@ -97,6 +97,9 @@ void main() async {
   });
 
   bool sessionRestored = await MatrixService.restoreSession();
+  if (sessionRestored) {
+    sessionRestored = await MatrixService.validateRestoredSession();
+  }
 
   runApp(
     EasyLocalization(
@@ -118,9 +121,14 @@ class ICSApp extends StatefulWidget {
 }
 
 class _ICSAppState extends State<ICSApp> with WidgetsBindingObserver {
+  late bool _sessionRestored;
+  String? _sessionNoticeKey;
+
   @override
   void initState() {
     super.initState();
+    _sessionRestored = widget.sessionRestored;
+    MatrixService.authEventNoticeKey.addListener(_onAuthEventNotice);
     WidgetsBinding.instance.addObserver(this);
 
     const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -168,6 +176,17 @@ class _ICSAppState extends State<ICSApp> with WidgetsBindingObserver {
     });
   }
 
+  void _onAuthEventNotice() {
+    final noticeKey = MatrixService.authEventNoticeKey.value;
+    if (noticeKey == null || noticeKey.isEmpty) return;
+    if (!mounted) return;
+    setState(() {
+      _sessionRestored = false;
+      _sessionNoticeKey = noticeKey;
+    });
+    MatrixService.clearAuthEventNotice();
+  }
+
   void cancelNotificationForCurrentChat(String chatRoomId) {
     if (chatRoomId.isNotEmpty) {
       flutterLocalNotificationsPlugin.cancel(
@@ -178,6 +197,7 @@ class _ICSAppState extends State<ICSApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    MatrixService.authEventNoticeKey.removeListener(_onAuthEventNotice);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -189,13 +209,19 @@ class _ICSAppState extends State<ICSApp> with WidgetsBindingObserver {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue),
       home: SafeArea(
-        child: widget.sessionRestored
+        child: _sessionRestored
             ? MainScreen(
           accessToken: MatrixService.authToken,
           username: MatrixService.userId,
           cancelNotificationForCurrentChat: cancelNotificationForCurrentChat,
         )
-            : const LoginScreen(),
+            : LoginScreen(
+                sessionNoticeKey: _sessionNoticeKey,
+                onSessionNoticeShown: () {
+                  if (!mounted) return;
+                  setState(() => _sessionNoticeKey = null);
+                },
+              ),
       ),
       navigatorObservers: [routeObserver],
       localizationsDelegates: context.localizationDelegates,

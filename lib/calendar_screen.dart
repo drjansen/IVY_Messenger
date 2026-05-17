@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'matrix_service.dart';
 import 'session_manager.dart';
 
 class CalendarEvent {
@@ -124,6 +125,7 @@ class _CalendarScreenState extends State<CalendarScreen> with TickerProviderStat
       }
       final uri = Uri.parse('https://reports.icsportals.org/calendar/roles/$username');
       final response = await http.get(uri, headers: _buildAuthHeaders());
+      await MatrixService.handlePotentialRevokedSessionResponse(response);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final elementary = data['elementary'] == true;
@@ -188,6 +190,7 @@ class _CalendarScreenState extends State<CalendarScreen> with TickerProviderStat
 
       final uri = Uri.parse('https://reports.icsportals.org/calendar/events/$username');
       final response = await http.get(uri, headers: _buildAuthHeaders());
+      await MatrixService.handlePotentialRevokedSessionResponse(response);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final eventsJson = data is List ? data : (data['events'] as List);

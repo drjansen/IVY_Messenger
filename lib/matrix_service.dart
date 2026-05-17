@@ -8,7 +8,8 @@ import 'package:http_parser/http_parser.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show ValueNotifier, kIsWeb;
+import 'session_manager.dart';
 
 enum MatrixLoginStatus {
   success,
@@ -35,8 +36,8 @@ class MatrixLoginResult {
 
 class MatrixService {
   static const _baseUrl = 'https://app.icsportals.org';
-  static late String _authToken;
-  static late String _userId;
+  static String _authToken = '';
+  static String _userId = '';
 
   static String get rocketchatAuthToken => _authToken;
   static String get rocketchatUserId => _userId;
@@ -52,6 +53,9 @@ class MatrixService {
 
   // --- Rate limit state (messages) ---
   static DateTime? _messagesRateLimitedUntil;
+  static bool _revokedSessionHandled = false;
+  static final ValueNotifier<String?> authEventNoticeKey =
+      ValueNotifier<String?>(null);
 
   static const _secure = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -86,6 +90,71 @@ class MatrixService {
     await prefs.remove('matrix_auth_token');
     await prefs.remove('matrix_user_id');
   }
+
+  static void clearAuthEventNotice() {
+    authEventNoticeKey.value = null;
+  }
+
+  static bool _matchesRevokedCode(String? value) {
+    if (value == null || value.trim().isEmpty) return false;
+    final normalized = value.trim().toUpperCase();
+    return normalized.contains('SESSION_REVOKED') ||
+        normalized.contains('LOGGED_IN_ON_ANOTHER_DEVICE') ||
+        normalized.contains('SESSION_SUPERSEDED');
+  }
+
+  static bool _isRevokedSessionResponse(int statusCode, String? body) {
+    if (statusCode != 401 && statusCode != 403) return false;
+    if (body == null || body.trim().isEmpty) return false;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return false;
+      final candidates = <String?>[
+        decoded['code']?.toString(),
+        decoded['errorCode']?.toString(),
+        decoded['error_type']?.toString(),
+        decoded['errorType']?.toString(),
+        decoded['detail']?.toString(),
+        decoded['error']?.toString(),
+        decoded['message']?.toString(),
+      ];
+      return candidates.any(_matchesRevokedCode);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> _enforceRevokedSessionLogout() async {
+    if (_revokedSessionHandled) return;
+    _revokedSessionHandled = true;
+    await clearSession();
+    await SessionManager.clearSession();
+    authEventNoticeKey.value = 'session_revoked_notice';
+  }
+
+  static Future<void> handlePotentialRevokedSessionResponse(
+    http.Response resp,
+  ) async {
+    if (_isRevokedSessionResponse(resp.statusCode, resp.body)) {
+      await _enforceRevokedSessionLogout();
+    }
+  }
+
+  static Future<void> handlePotentialRevokedSessionStatus(
+    int statusCode, {
+    String? responseBody,
+  }) async {
+    if (_isRevokedSessionResponse(statusCode, responseBody)) {
+      await _enforceRevokedSessionLogout();
+    }
+  }
+
+  /// Exposed for unit testing only.
+  static bool isRevokedSessionResponseForTesting({
+    required int statusCode,
+    required String body,
+  }) =>
+      _isRevokedSessionResponse(statusCode, body);
 
   /// Calls the Rocket.Chat server-side logout endpoint, then clears all local
   /// auth state.  Best-effort: a network failure does not prevent local cleanup.
@@ -175,6 +244,29 @@ class MatrixService {
     'X-User-Id': _userId,
   };
 
+  static Future<http.Response> _authedGet(
+    Uri uri, {
+    Map<String, String>? headers,
+  }) async {
+    final resp = await http.get(uri, headers: headers ?? _headers);
+    await handlePotentialRevokedSessionResponse(resp);
+    return resp;
+  }
+
+  static Future<http.Response> _authedPost(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  }) async {
+    final resp = await http.post(
+      uri,
+      headers: headers ?? _headers,
+      body: body,
+    );
+    await handlePotentialRevokedSessionResponse(resp);
+    return resp;
+  }
+
   /// Adds rc_uid/rc_token query parameters to a URL (relative or absolute),
   /// preserving any existing query parameters.
   static Uri withAuthQuery(String url) {
@@ -202,7 +294,7 @@ class MatrixService {
     for (int i = 0; i <= maxRedirects; i++) {
       http.Response resp;
       try {
-        resp = await http.get(current, headers: _authHeaders).timeout(timeout);
+        resp = await _authedGet(current, headers: _authHeaders).timeout(timeout);
       } catch (e) {
         assert(() {
           // ignore: avoid_print
@@ -353,9 +445,8 @@ class MatrixService {
     }
 
     try {
-      final resp = await http.get(
+      final resp = await _authedGet(
         Uri.parse('$_baseUrl/api/v1/users.info?userId=$userId'),
-        headers: _headers,
       );
 
       if (resp.statusCode == 429) {
@@ -492,6 +583,8 @@ class MatrixService {
 
       _authToken = authToken;
       _userId = userId;
+      _revokedSessionHandled = false;
+      authEventNoticeKey.value = null;
 
       _avatarCache.clear();
       _cachedMe = null;
@@ -512,9 +605,8 @@ class MatrixService {
 
   static Future<List<Map<String, dynamic>>> fetchJoinedRoomIds(String _) async {
     try {
-      final resp = await http.get(
+      final resp = await _authedGet(
         Uri.parse('$_baseUrl/api/v1/subscriptions.get'),
-        headers: _headers,
       );
 
       if (resp.statusCode == 429) {
@@ -611,9 +703,8 @@ class MatrixService {
         : 'groups.messages';
 
     try {
-      final resp = await http.get(
+      final resp = await _authedGet(
         Uri.parse('$_baseUrl/api/v1/$endpoint?roomId=$roomId&count=50'),
-        headers: _headers,
       );
 
       if (resp.statusCode == 429) {
@@ -720,9 +811,8 @@ class MatrixService {
     };
 
     try {
-      final resp = await http.post(
+      final resp = await _authedPost(
         Uri.parse('$_baseUrl/api/v1/chat.postMessage'),
-        headers: _headers,
         body: jsonEncode(payload),
       );
 
@@ -782,6 +872,10 @@ class MatrixService {
     try {
       final res = await req.send();
       final body = await res.stream.bytesToString();
+      await handlePotentialRevokedSessionStatus(
+        res.statusCode,
+        responseBody: body,
+      );
       assert(() {
         // ignore: avoid_print
         print('⬅️ rooms.media ← ${res.statusCode}');
@@ -848,6 +942,10 @@ class MatrixService {
     try {
       final res = await req.send();
       final body = await res.stream.bytesToString();
+      await handlePotentialRevokedSessionStatus(
+        res.statusCode,
+        responseBody: body,
+      );
       assert(() {
         // ignore: avoid_print
         print('⬅️ rooms.media(bytes) ← ${res.statusCode}');
@@ -927,9 +1025,8 @@ class MatrixService {
     };
 
     try {
-      final resp = await http.post(
+      final resp = await _authedPost(
         Uri.parse('$_baseUrl/api/v1/chat.postMessage'),
-        headers: _headers,
         body: jsonEncode(payload),
       );
 
@@ -1032,9 +1129,8 @@ class MatrixService {
     if (token == null) return;
 
     try {
-      await http.post(
+      await _authedPost(
         Uri.parse('$_baseUrl/api/v1/push.token'),
-        headers: _headers,
         body: jsonEncode({
           'type': 'gcm',
           'value': token,
@@ -1052,9 +1148,8 @@ class MatrixService {
 
   static Future<bool> markRoomAsRead(String roomId) async {
     try {
-      final resp = await http.post(
+      final resp = await _authedPost(
         Uri.parse('$_baseUrl/api/v1/subscriptions.read'),
-        headers: _headers,
         body: jsonEncode({'rid': roomId}),
       );
 
@@ -1097,9 +1192,8 @@ class MatrixService {
     Map<String, dynamic>? userMap;
 
     try {
-      final resp = await http.get(
+      final resp = await _authedGet(
         Uri.parse('$_baseUrl/api/v1/me'),
-        headers: _headers,
       );
 
       if (resp.statusCode == 429) {
@@ -1144,9 +1238,8 @@ class MatrixService {
 
     if (userMap == null) {
       try {
-        final info = await http.get(
+        final info = await _authedGet(
           Uri.parse('$_baseUrl/api/v1/users.info?userId=$_userId'),
-          headers: _headers,
         );
 
         if (info.statusCode == 429) {
@@ -1231,6 +1324,10 @@ class MatrixService {
     try {
       final res = await req.send();
       final body = await res.stream.bytesToString();
+      await handlePotentialRevokedSessionStatus(
+        res.statusCode,
+        responseBody: body,
+      );
       assert(() {
         // ignore: avoid_print
         print('⬅️ setAvatar ← ${res.statusCode}');
@@ -1273,7 +1370,7 @@ class MatrixService {
     });
 
     try {
-      final resp = await http.post(uri, headers: _headers, body: body);
+      final resp = await _authedPost(uri, body: body);
 
       if (resp.statusCode == 429) {
         assert(() {
@@ -1306,9 +1403,8 @@ class MatrixService {
 
   static Future<bool> reactToMessage(String messageId, String emoji) async {
     try {
-      final resp = await http.post(
+      final resp = await _authedPost(
         Uri.parse('$_baseUrl/api/v1/chat.react'),
-        headers: _headers,
         body: jsonEncode({'messageId': messageId, 'emoji': emoji}),
       );
 
@@ -1336,9 +1432,8 @@ class MatrixService {
 
   static Future<bool> deleteMessage(String roomId, String messageId) async {
     try {
-      final resp = await http.post(
+      final resp = await _authedPost(
         Uri.parse('$_baseUrl/api/v1/chat.delete'),
-        headers: _headers,
         body: jsonEncode({'roomId': roomId, 'msgId': messageId}),
       );
 
@@ -1371,5 +1466,24 @@ class MatrixService {
     _lastAvatarFetch = null;
 
     _messagesRateLimitedUntil = null;
+  }
+
+  /// Validates a restored session at startup to avoid entering a broken
+  /// authenticated state with stale local tokens.
+  static Future<bool> validateRestoredSession() async {
+    if (_authToken.isEmpty || _userId.isEmpty) return false;
+    try {
+      final resp = await _authedGet(Uri.parse('$_baseUrl/api/v1/me'));
+      if (resp.statusCode == 200) return true;
+      if (resp.statusCode == 401 || resp.statusCode == 403) {
+        await clearSession();
+        await SessionManager.clearSession();
+        return false;
+      }
+      return true;
+    } catch (_) {
+      // Connectivity issues should not force a logout.
+      return true;
+    }
   }
 }

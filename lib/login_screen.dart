@@ -12,7 +12,14 @@ import 'session_manager.dart';
 import 'two_factor_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  final String? sessionNoticeKey;
+  final VoidCallback? onSessionNoticeShown;
+
+  const LoginScreen({
+    Key? key,
+    this.sessionNoticeKey,
+    this.onSessionNoticeShown,
+  }) : super(key: key);
 
   @override
   _LoginScreenState createState() => _LoginScreenState();
@@ -26,6 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool agreedToTerms = false;
   bool rememberMe = false;
   String error = '';
+  String? sessionNoticeKey;
   String? currentLocale;
 
   @override
@@ -38,6 +46,12 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    sessionNoticeKey = widget.sessionNoticeKey;
+    if (sessionNoticeKey != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onSessionNoticeShown?.call();
+      });
+    }
     _loadSavedCredentials();
     _loadSavedLocale();
   }
@@ -107,10 +121,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _finishSuccessfulLogin(String username) async {
     // ── Device-policy check ──────────────────────────────────────────────
     // Submit device information to the policy backend before completing login.
-    // The backend registers new devices and logs a multi_device_detected event
-    // (with an internal alert email) when a different device is seen — it no
-    // longer blocks access on mismatch.  A genuine server/transport error is
-    // still surfaced to the user.
+    // The backend tracks exclusive-session state and can signal when this
+    // session has already been superseded by a newer login on another device.
     setState(() => loading = true);
 
     // Guard: userId must be populated by a successful login before reaching here.
@@ -138,6 +150,15 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         loading = false;
         error = tr('device_policy_error');
+      });
+      return;
+    }
+
+    if (policyResult == DevicePolicyResult.revoked) {
+      await MatrixService.forceLogoutForRevokedSession();
+      setState(() {
+        loading = false;
+        sessionNoticeKey = 'session_revoked_notice';
       });
       return;
     }
@@ -282,6 +303,11 @@ class _LoginScreenState extends State<LoginScreen> {
               // Error message
               if (error.isNotEmpty)
                 Text(error, style: const TextStyle(color: Colors.red)),
+              if (sessionNoticeKey != null)
+                Text(
+                  tr(sessionNoticeKey!),
+                  style: const TextStyle(color: Colors.deepOrange),
+                ),
               const SizedBox(height: 20),
 
               // Legal notice (can be translated)

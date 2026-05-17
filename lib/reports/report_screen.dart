@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main_screen.dart';
+import '../matrix_service.dart';
 import 'package:ics_messenger_app/session_manager.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:intl/intl.dart';
@@ -196,6 +197,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
+      await MatrixService.handlePotentialRevokedSessionResponse(response);
 
       if (response.statusCode == 200) {
         await showDialog(

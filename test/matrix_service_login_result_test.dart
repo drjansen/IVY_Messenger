@@ -75,4 +75,37 @@ void main() {
       expect(result.status, MatrixLoginStatus.failure);
     });
   });
+
+  group('isRevokedSessionResponseForTesting', () {
+    test('detects SESSION_REVOKED code on auth failure status', () {
+      final body = jsonEncode({
+        'code': 'SESSION_REVOKED',
+        'detail': 'Session invalidated by newer login.',
+      });
+
+      final detected = MatrixService.isRevokedSessionResponseForTesting(
+        statusCode: 403,
+        body: body,
+      );
+
+      expect(detected, isTrue);
+    });
+
+    test('does not treat generic unauthorized as revoked session', () {
+      final body = jsonEncode({'error': 'Unauthorized'});
+
+      final detected = MatrixService.isRevokedSessionResponseForTesting(
+        statusCode: 401,
+        body: body,
+      );
+
+      expect(detected, isFalse);
+    });
+  });
+
+  test('clearAuthEventNotice clears any pending auth event notice', () {
+    MatrixService.authEventNoticeKey.value = 'session_revoked_notice';
+    MatrixService.clearAuthEventNotice();
+    expect(MatrixService.authEventNoticeKey.value, isNull);
+  });
 }

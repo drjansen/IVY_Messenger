@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'matrix_service.dart';
 import 'session_manager.dart';
 
 // --- Models ---
@@ -172,6 +173,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     try {
       final uri = Uri.parse('https://reports.icsportals.org/calendar/roles/$username');
       final response = await http.get(uri, headers: _buildAuthHeaders());
+      await MatrixService.handlePotentialRevokedSessionResponse(response);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final elementary = data['elementary'] == true;
@@ -207,6 +209,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final uri = Uri.parse('https://reports.icsportals.org/announcements');
     try {
       final response = await http.get(uri, headers: _buildAuthHeaders());
+      await MatrixService.handlePotentialRevokedSessionResponse(response);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final announcementsJson = data['announcements'] as List;
@@ -242,6 +245,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
     final uri = Uri.parse('https://reports.icsportals.org/children_attendance/$username');
     final response = await http.get(uri, headers: _buildAuthHeaders());
+    await MatrixService.handlePotentialRevokedSessionResponse(response);
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final childrenJson = data['children'] as List;
@@ -269,6 +273,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final uri = Uri.parse('https://reports.icsportals.org/lunch_menu/today');
     try {
       final response = await http.get(uri, headers: _buildAuthHeaders());
+      await MatrixService.handlePotentialRevokedSessionResponse(response);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         prefs.setString('cached_lunch_menu', json.encode(data));
@@ -302,6 +307,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
       final eventsUri = Uri.parse('https://reports.icsportals.org/calendar/events/$username');
       final eventsResp = await http.get(eventsUri, headers: _buildAuthHeaders());
+      await MatrixService.handlePotentialRevokedSessionResponse(eventsResp);
       if (eventsResp.statusCode != 200) {
         return [];
       }

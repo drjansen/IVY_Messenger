@@ -6,6 +6,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'matrix_service.dart';
 
 /// Result of a device-policy check call to the policy backend.
 enum DevicePolicyResult {
@@ -17,15 +18,17 @@ enum DevicePolicyResult {
   /// Callers may choose to block or allow depending on their fail-open/fail-closed
   /// preference; the UI layer is responsible for presenting an appropriate message.
   error,
+
+  /// The backend indicates this session was revoked/superseded by another login.
+  revoked,
 }
 
 /// Integrates with the ICS messenger-app policy backend.
 ///
-/// The backend registers the first device seen for each user and, on a
-/// subsequent login from a different device, logs a `multi_device_detected`
-/// event and sends an internal alert email — it no longer blocks access.
-/// This class always submits device information to the backend so that
-/// monitoring data remains accurate.
+/// The backend tracks single-device session ownership and signals explicit
+/// revocation responses when a newer login supersedes this session. This class
+/// submits device information and interprets those revocation responses so the
+/// UI can force local logout.
 ///
 /// ## What data is collected
 /// Only the minimum set required by the policy backend:
@@ -82,10 +85,9 @@ class DevicePolicyService {
   /// Must be called **after** a successful Rocket.Chat login so that
   /// [userId] and [username] are available.
   ///
-  /// The backend now always allows login: on a first-seen device it registers
-  /// the device, and on a mismatch it records a `multi_device_detected` event
-  /// and sends an internal alert.  This method therefore returns:
-  /// - [DevicePolicyResult.allowed]  → backend responded with 200; continue login
+  /// Returns:
+  /// - [DevicePolicyResult.allowed]  → backend accepted the current session
+  /// - [DevicePolicyResult.revoked]  → backend reports this session is superseded
   /// - [DevicePolicyResult.error]    → transport/server error; caller decides
   static Future<DevicePolicyResult> checkDevicePolicy({
     required String userId,
@@ -117,6 +119,14 @@ class DevicePolicyService {
 
       if (resp.statusCode == 200) {
         return DevicePolicyResult.allowed;
+      }
+
+      if ((resp.statusCode == 401 || resp.statusCode == 403) &&
+          MatrixService.looksLikeRevokedSessionStatus(
+            resp.statusCode,
+            responseBody: resp.body,
+          )) {
+        return DevicePolicyResult.revoked;
       }
 
       // Any non-200 status indicates an unexpected server or configuration error.

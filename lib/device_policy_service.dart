@@ -97,6 +97,7 @@ class DevicePolicyService {
   }) async {
     final resolvedAuthToken = authToken ?? MatrixService.authToken;
     final resolvedUserId = sessionUserId ?? MatrixService.userId;
+    http.Client? requestClient;
     if (resolvedAuthToken.isEmpty || resolvedUserId.isEmpty) {
       assert(() {
         // ignore: avoid_print
@@ -105,13 +106,11 @@ class DevicePolicyService {
       }());
       return DevicePolicyResult.error;
     }
-    _DeviceInfo? overrideDeviceInfo;
-    if (deviceName != null && platform != null) {
-      overrideDeviceInfo = _DeviceInfo(
-        deviceName: deviceName,
-        platform: platform,
-      );
-    } else if (deviceName != null || platform != null) {
+    final overrideDeviceInfo = _buildDeviceInfoOverride(
+      deviceName: deviceName,
+      platform: platform,
+    );
+    if ((deviceName == null) != (platform == null)) {
       assert(() {
         // ignore: avoid_print
         print(
@@ -122,8 +121,8 @@ class DevicePolicyService {
       return DevicePolicyResult.error;
     }
 
-    final requestClient = client ?? http.Client();
     try {
+      requestClient = client ?? http.Client();
       final resolvedDeviceId = deviceId ?? await getOrCreateDeviceId();
       final resolvedDeviceInfo = overrideDeviceInfo ?? await getDeviceInfo();
 
@@ -175,7 +174,7 @@ class DevicePolicyService {
       return DevicePolicyResult.error;
     } finally {
       if (client == null) {
-        requestClient.close();
+        requestClient?.close();
       }
     }
   }
@@ -245,6 +244,15 @@ class DevicePolicyService {
 
   /// Exposed for unit testing only.
   static String generateUuidV4ForTesting() => _generateUuidV4();
+
+  static _DeviceInfo? _buildDeviceInfoOverride({
+    required String? deviceName,
+    required String? platform,
+  }) {
+    if (deviceName == null && platform == null) return null;
+    if (deviceName == null || platform == null) return null;
+    return _DeviceInfo(deviceName: deviceName, platform: platform);
+  }
 
   /// Generates a UUID v4 using a cryptographically secure random source.
   static String _generateUuidV4() {

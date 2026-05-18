@@ -66,7 +66,7 @@ void main() {
       },
     );
 
-    test('checkDevicePolicy fails closed when session headers are missing', () async {
+    test('checkDevicePolicy fails closed when auth token is missing', () async {
       final client = MockClient((request) async {
         fail('HTTP client should not be called when session headers are missing');
       });
@@ -83,7 +83,7 @@ void main() {
       expect(result, DevicePolicyResult.error);
     });
 
-    test('checkDevicePolicy fails closed when session user id is missing', () async {
+    test('checkDevicePolicy fails closed when session user ID is missing', () async {
       final client = MockClient((request) async {
         fail('HTTP client should not be called when session headers are missing');
       });

@@ -226,11 +226,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _openPrivacyPolicy() async {
-    final launched = await launchUrl(
-      _privacyPolicyUri,
-      mode: LaunchMode.externalApplication,
-    );
-    if (!launched && mounted) {
+    try {
+      final launched = await launchUrl(
+        _privacyPolicyUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (launched || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('privacy_policy_open_error'.tr())),
+      );
+    } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('privacy_policy_open_error'.tr())),
       );

@@ -105,10 +105,18 @@ class DevicePolicyService {
       }());
       return DevicePolicyResult.error;
     }
-    if ((deviceName == null) != (platform == null)) {
+    _DeviceInfo? overrideDeviceInfo;
+    if (deviceName != null && platform != null) {
+      overrideDeviceInfo = _DeviceInfo(
+        deviceName: deviceName,
+        platform: platform,
+      );
+    } else if (deviceName != null || platform != null) {
       assert(() {
         // ignore: avoid_print
-        print('⚠️ DevicePolicyService: deviceName/platform overrides must be provided together');
+        print(
+          '⚠️ DevicePolicyService: deviceName/platform test overrides must be provided together',
+        );
         return true;
       }());
       return DevicePolicyResult.error;
@@ -117,9 +125,7 @@ class DevicePolicyService {
     final requestClient = client ?? http.Client();
     try {
       final resolvedDeviceId = deviceId ?? await getOrCreateDeviceId();
-      final resolvedDeviceInfo = deviceName != null
-          ? _DeviceInfo(deviceName: deviceName, platform: platform!)
-          : await getDeviceInfo();
+      final resolvedDeviceInfo = overrideDeviceInfo ?? await getDeviceInfo();
 
       final payload = <String, String>{
         'device_id': resolvedDeviceId,

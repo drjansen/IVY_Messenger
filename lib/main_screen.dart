@@ -6,7 +6,7 @@ import 'chat_rooms_tab.dart';
 import 'user_bar.dart';
 import 'reports/report_screen.dart'; // <-- Import added!
 import '../dashboard_screen.dart';
-import '../calendar_screen.dart';
+// import '../calendar_screen.dart'; // DISABLED: Calendar tab temporarily hidden
 import '../ptc_screen.dart';
 import 'matrix_service.dart'; // or matrix_service.dart if that is correct
 import '../login_screen.dart';
@@ -58,7 +58,7 @@ class _MainScreenState extends State<MainScreen> {
         },
         cancelNotificationForCurrentChat: widget.cancelNotificationForCurrentChat,
       ),
-      const CalendarScreen(),
+      // const CalendarScreen(), // DISABLED: Calendar tab temporarily hidden
       const PtcScreen(),
       const ReportScreen(), // <-- Tab added!
     ];
@@ -224,10 +224,11 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     label: tr('tab_chat'),
                   ),
-                  BottomNavigationBarItem(
-                    icon: const Icon(Icons.calendar_today),
-                    label: tr('tab_calendar'),
-                  ),
+                  // DISABLED: Calendar tab temporarily hidden
+                  // BottomNavigationBarItem(
+                  //   icon: const Icon(Icons.calendar_today),
+                  //   label: tr('tab_calendar'),
+                  // ),
                   BottomNavigationBarItem(
                     icon: const Icon(Icons.people),
                     label: tr('tab_ptc'),

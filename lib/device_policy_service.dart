@@ -97,7 +97,6 @@ class DevicePolicyService {
   }) async {
     final resolvedAuthToken = authToken ?? MatrixService.authToken;
     final resolvedUserId = sessionUserId ?? MatrixService.userId;
-    http.Client? requestClient;
     if (resolvedAuthToken.isEmpty || resolvedUserId.isEmpty) {
       assert(() {
         // ignore: avoid_print
@@ -106,23 +105,23 @@ class DevicePolicyService {
       }());
       return DevicePolicyResult.error;
     }
-    final overrideDeviceInfo = _buildDeviceInfoOverride(
-      deviceName: deviceName,
-      platform: platform,
-    );
-    if ((deviceName == null) != (platform == null)) {
+    _DeviceInfo? overrideDeviceInfo;
+    try {
+      overrideDeviceInfo = _buildDeviceInfoOverride(
+        deviceName: deviceName,
+        platform: platform,
+      );
+    } on ArgumentError catch (e) {
       assert(() {
         // ignore: avoid_print
-        print(
-          '⚠️ DevicePolicyService: deviceName/platform test overrides must be provided together',
-        );
+        print('⚠️ DevicePolicyService: ${e.message}');
         return true;
       }());
       return DevicePolicyResult.error;
     }
 
+    final requestClient = client ?? http.Client();
     try {
-      requestClient = client ?? http.Client();
       final resolvedDeviceId = deviceId ?? await getOrCreateDeviceId();
       final resolvedDeviceInfo = overrideDeviceInfo ?? await getDeviceInfo();
 
@@ -174,7 +173,7 @@ class DevicePolicyService {
       return DevicePolicyResult.error;
     } finally {
       if (client == null) {
-        requestClient?.close();
+        requestClient.close();
       }
     }
   }
@@ -250,7 +249,11 @@ class DevicePolicyService {
     required String? platform,
   }) {
     if (deviceName == null && platform == null) return null;
-    if (deviceName == null || platform == null) return null;
+    if (deviceName == null || platform == null) {
+      throw ArgumentError(
+        'deviceName/platform test overrides must be provided together',
+      );
+    }
     return _DeviceInfo(deviceName: deviceName, platform: platform);
   }
 

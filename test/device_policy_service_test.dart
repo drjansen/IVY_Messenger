@@ -162,5 +162,29 @@ void main() {
 
       expect(result, DevicePolicyResult.allowed);
     });
+
+    test('checkSessionStatus URL-encodes legacy GET device_id', () async {
+      final client = MockClient((request) async {
+        if (request.method == 'POST') {
+          return http.Response('{}', 405);
+        }
+        expect(request.method, 'GET');
+        expect(request.url.queryParameters['device_id'], 'device id&123');
+        expect(
+          request.url.toString(),
+          'https://apppolicy.icsportals.org/session/status?device_id=device+id%26123',
+        );
+        return http.Response('{}', 200);
+      });
+
+      final result = await DevicePolicyService.checkSessionStatus(
+        client: client,
+        authToken: 'auth-token',
+        sessionUserId: 'user-id',
+        deviceId: 'device id&123',
+      );
+
+      expect(result, DevicePolicyResult.allowed);
+    });
   });
 }

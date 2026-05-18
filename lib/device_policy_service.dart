@@ -229,12 +229,13 @@ class DevicePolicyService {
         return DevicePolicyResult.revoked;
       }
 
-      if (postResp.statusCode == 404 || postResp.statusCode == 405) {
+      if (postResp.statusCode == 405) {
+        final legacyUri = Uri.parse(
+          '$_policyBaseUrl$_statusPath',
+        ).replace(queryParameters: {'device_id': resolvedDeviceId});
         final legacyResp = await requestClient
             .get(
-              Uri.parse(
-                '$_policyBaseUrl$_statusPath?device_id=$resolvedDeviceId',
-              ),
+              legacyUri,
               headers: {
                 'X-App-Policy-Key': _policyApiKey,
                 'X-Auth-Token': resolvedAuthToken,

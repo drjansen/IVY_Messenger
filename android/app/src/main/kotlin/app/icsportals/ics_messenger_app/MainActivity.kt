@@ -10,10 +10,10 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         // 🔒 Disable screenshots and screen recording
         // Temporarily disabled so screenshots are allowed again
-        //window.setFlags(
-        //    WindowManager.LayoutParams.FLAG_SECURE,
-        //    WindowManager.LayoutParams.FLAG_SECURE
-        //)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
         // 🟢 Enable edge-to-edge for Android 15+ compatibility
         WindowCompat.setDecorFitsSystemWindows(window, false)
     }

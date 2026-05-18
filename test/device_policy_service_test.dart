@@ -82,5 +82,22 @@ void main() {
 
       expect(result, DevicePolicyResult.error);
     });
+
+    test('checkDevicePolicy fails closed when session user id is missing', () async {
+      final client = MockClient((request) async {
+        fail('HTTP client should not be called when session headers are missing');
+      });
+
+      final result = await DevicePolicyService.checkDevicePolicy(
+        client: client,
+        authToken: 'auth-token',
+        sessionUserId: '',
+        deviceId: 'device-123',
+        deviceName: 'Pixel 9',
+        platform: 'android',
+      );
+
+      expect(result, DevicePolicyResult.error);
+    });
   });
 }

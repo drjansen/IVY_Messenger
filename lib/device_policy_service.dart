@@ -95,8 +95,8 @@ class DevicePolicyService {
     String? deviceName,
     String? platform,
   }) async {
-    final resolvedAuthToken = authToken ?? MatrixService.rocketchatAuthToken;
-    final resolvedUserId = sessionUserId ?? MatrixService.rocketchatUserId;
+    final resolvedAuthToken = authToken ?? MatrixService.authToken;
+    final resolvedUserId = sessionUserId ?? MatrixService.userId;
     if (resolvedAuthToken.isEmpty || resolvedUserId.isEmpty) {
       assert(() {
         // ignore: avoid_print
@@ -105,12 +105,20 @@ class DevicePolicyService {
       }());
       return DevicePolicyResult.error;
     }
+    if ((deviceName == null) != (platform == null)) {
+      assert(() {
+        // ignore: avoid_print
+        print('⚠️ DevicePolicyService: deviceName/platform overrides must be provided together');
+        return true;
+      }());
+      return DevicePolicyResult.error;
+    }
 
     final requestClient = client ?? http.Client();
     try {
       final resolvedDeviceId = deviceId ?? await getOrCreateDeviceId();
-      final resolvedDeviceInfo = deviceName != null && platform != null
-          ? _DeviceInfo(deviceName: deviceName, platform: platform)
+      final resolvedDeviceInfo = deviceName != null
+          ? _DeviceInfo(deviceName: deviceName, platform: platform!)
           : await getDeviceInfo();
 
       final payload = <String, String>{

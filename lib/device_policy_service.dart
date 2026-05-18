@@ -51,8 +51,11 @@ class DevicePolicyService {
   /// Override this constant when deploying to a different environment.
   static const _policyBaseUrl = 'https://apppolicy.icsportals.org';
 
-  /// The path of the device-policy check endpoint.
-  static const _checkPath = '/session/register';
+  /// The path of the session registration endpoint.
+  static const _registerPath = '/session/register';
+
+  /// The path of the session status endpoint.
+  static const _statusPath = '/session/status';
 
   /// Pre-shared API key sent in the `X-App-Policy-Key` request header.
   ///
@@ -134,7 +137,7 @@ class DevicePolicyService {
 
       final resp = await requestClient
           .post(
-            Uri.parse('$_policyBaseUrl$_checkPath'),
+            Uri.parse('$_policyBaseUrl$_registerPath'),
             headers: {
               'Content-Type': 'application/json',
               'X-App-Policy-Key': _policyApiKey,
@@ -168,6 +171,96 @@ class DevicePolicyService {
       assert(() {
         // ignore: avoid_print
         print('⚠️ DevicePolicyService: request failed: $e');
+        return true;
+      }());
+      return DevicePolicyResult.error;
+    } finally {
+      if (client == null) {
+        requestClient.close();
+      }
+    }
+  }
+
+  /// Checks session status against the policy backend for the current device.
+  ///
+  /// Uses the hardened POST contract first. If unsupported by an older backend,
+  /// falls back to legacy GET with `device_id` query parameter.
+  static Future<DevicePolicyResult> checkSessionStatus({
+    http.Client? client,
+    String? authToken,
+    String? sessionUserId,
+    String? deviceId,
+  }) async {
+    final resolvedAuthToken = authToken ?? MatrixService.authToken;
+    final resolvedUserId = sessionUserId ?? MatrixService.userId;
+    if (resolvedAuthToken.isEmpty || resolvedUserId.isEmpty) {
+      assert(() {
+        // ignore: avoid_print
+        print('⚠️ DevicePolicyService: missing Rocket.Chat session headers');
+        return true;
+      }());
+      return DevicePolicyResult.error;
+    }
+
+    final requestClient = client ?? http.Client();
+    try {
+      final resolvedDeviceId = deviceId ?? await getOrCreateDeviceId();
+      final postResp = await requestClient
+          .post(
+            Uri.parse('$_policyBaseUrl$_statusPath'),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-App-Policy-Key': _policyApiKey,
+              'X-Auth-Token': resolvedAuthToken,
+              'X-User-Id': resolvedUserId,
+            },
+            body: jsonEncode(<String, String>{'device_id': resolvedDeviceId}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (postResp.statusCode == 200) {
+        return DevicePolicyResult.allowed;
+      }
+      if ((postResp.statusCode == 401 || postResp.statusCode == 403) &&
+          MatrixService.looksLikeRevokedSessionStatus(
+            postResp.statusCode,
+            responseBody: postResp.body,
+          )) {
+        return DevicePolicyResult.revoked;
+      }
+
+      if (postResp.statusCode == 405) {
+        final legacyUri = Uri.parse(
+          '$_policyBaseUrl$_statusPath',
+        ).replace(queryParameters: {'device_id': resolvedDeviceId});
+        final legacyResp = await requestClient
+            .get(
+              legacyUri,
+              headers: {
+                'X-App-Policy-Key': _policyApiKey,
+                'X-Auth-Token': resolvedAuthToken,
+                'X-User-Id': resolvedUserId,
+              },
+            )
+            .timeout(const Duration(seconds: 10));
+
+        if (legacyResp.statusCode == 200) {
+          return DevicePolicyResult.allowed;
+        }
+        if ((legacyResp.statusCode == 401 || legacyResp.statusCode == 403) &&
+            MatrixService.looksLikeRevokedSessionStatus(
+              legacyResp.statusCode,
+              responseBody: legacyResp.body,
+            )) {
+          return DevicePolicyResult.revoked;
+        }
+      }
+
+      return DevicePolicyResult.error;
+    } catch (e) {
+      assert(() {
+        // ignore: avoid_print
+        print('⚠️ DevicePolicyService: status check failed: $e');
         return true;
       }());
       return DevicePolicyResult.error;

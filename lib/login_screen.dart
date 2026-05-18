@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'device_policy_service.dart';
 import 'matrix_service.dart';
@@ -26,6 +27,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static final Uri _privacyPolicyUri = Uri.parse('https://privacy.icsportals.org/');
+
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
@@ -222,6 +225,26 @@ class _LoginScreenState extends State<LoginScreen> {
     return pattern.hasMatch(email);
   }
 
+  Future<void> _openPrivacyPolicy() async {
+    try {
+      final launched = await launchUrl(
+        _privacyPolicyUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('privacy_policy_open_error'.tr())),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      debugPrint('Failed to open privacy policy URL: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('privacy_policy_open_error'.tr())),
+      );
+    }
+  }
+
   Future<void> _showForgotPasswordDialog() async {
     // ── Step 1: collect email and request reset code ──────────────────────
     final email = await showDialog<String>(
@@ -315,6 +338,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 'legal_notice'.tr(),
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                 textAlign: TextAlign.justify,
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _openPrivacyPolicy,
+                  child: Text('privacy_policy_link'.tr()),
+                ),
               ),
               const SizedBox(height: 15),
 

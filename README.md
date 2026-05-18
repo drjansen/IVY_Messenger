@@ -1,6 +1,6 @@
 # ics_messenger_app
 
-ICS Parent Messenger App
+IVY Messenger App
 
 ## Getting Started
 

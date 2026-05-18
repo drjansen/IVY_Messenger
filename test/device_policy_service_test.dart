@@ -100,4 +100,67 @@ void main() {
       expect(result, DevicePolicyResult.error);
     });
   });
+
+  group('DevicePolicyService session status', () {
+    test('checkSessionStatus sends POST body with device_id and auth headers',
+        () async {
+      final client = MockClient((request) async {
+        expect(
+          request.url.toString(),
+          'https://apppolicy.icsportals.org/session/status',
+        );
+        expect(request.method, 'POST');
+        expect(request.headers['Content-Type'], 'application/json');
+        expect(request.headers['X-App-Policy-Key'], isNotEmpty);
+        expect(request.headers['X-Auth-Token'], 'auth-token');
+        expect(request.headers['X-User-Id'], 'user-id');
+
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body, {'device_id': 'device-123'});
+
+        return http.Response('{}', 200);
+      });
+
+      final result = await DevicePolicyService.checkSessionStatus(
+        client: client,
+        authToken: 'auth-token',
+        sessionUserId: 'user-id',
+        deviceId: 'device-123',
+      );
+
+      expect(result, DevicePolicyResult.allowed);
+    });
+
+    test('checkSessionStatus fallback GET includes Rocket.Chat headers',
+        () async {
+      var sawPost = false;
+      final client = MockClient((request) async {
+        if (request.method == 'POST') {
+          sawPost = true;
+          return http.Response('{}', 405);
+        }
+
+        expect(sawPost, isTrue);
+        expect(request.method, 'GET');
+        expect(
+          request.url.toString(),
+          'https://apppolicy.icsportals.org/session/status?device_id=device-123',
+        );
+        expect(request.headers['X-App-Policy-Key'], isNotEmpty);
+        expect(request.headers['X-Auth-Token'], 'auth-token');
+        expect(request.headers['X-User-Id'], 'user-id');
+
+        return http.Response('{}', 200);
+      });
+
+      final result = await DevicePolicyService.checkSessionStatus(
+        client: client,
+        authToken: 'auth-token',
+        sessionUserId: 'user-id',
+        deviceId: 'device-123',
+      );
+
+      expect(result, DevicePolicyResult.allowed);
+    });
+  });
 }

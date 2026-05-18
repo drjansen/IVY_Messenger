@@ -105,9 +105,9 @@ class DevicePolicyService {
       }());
       return DevicePolicyResult.error;
     }
-    _DeviceInfo? overrideDeviceInfo;
+    _DeviceInfo? testDeviceInfo;
     try {
-      overrideDeviceInfo = _buildDeviceInfoOverride(
+      testDeviceInfo = _buildTestDeviceInfoOverride(
         deviceName: deviceName,
         platform: platform,
       );
@@ -123,7 +123,7 @@ class DevicePolicyService {
     final requestClient = client ?? http.Client();
     try {
       final resolvedDeviceId = deviceId ?? await getOrCreateDeviceId();
-      final resolvedDeviceInfo = overrideDeviceInfo ?? await getDeviceInfo();
+      final resolvedDeviceInfo = testDeviceInfo ?? await getDeviceInfo();
 
       final payload = <String, String>{
         'device_id': resolvedDeviceId,
@@ -244,7 +244,7 @@ class DevicePolicyService {
   /// Exposed for unit testing only.
   static String generateUuidV4ForTesting() => _generateUuidV4();
 
-  static _DeviceInfo? _buildDeviceInfoOverride({
+  static _DeviceInfo? _buildTestDeviceInfoOverride({
     required String? deviceName,
     required String? platform,
   }) {

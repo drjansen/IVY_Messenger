@@ -60,7 +60,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     // This avoids leaking sensitive message content to the lock screen.
     val publicNotif = NotificationCompat.Builder(this, channelId)
       .setSmallIcon(R.mipmap.ic_launcher)
-      .setContentTitle("ICS Messenger")
+      .setContentTitle("IVY Messenger")
       .setContentText("New message")
       .build()
 

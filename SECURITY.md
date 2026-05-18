@@ -1,4 +1,4 @@
-# Security Notes – ICS Messenger App
+# Security Notes – IVY Messenger App
 
 This document summarises the security findings from the initial review
 (May 2026) and tracks the status of each item.

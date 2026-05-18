@@ -28,7 +28,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 Future<void> showSimpleNotification(RemoteMessage message) async {
   final data = message.data;
   final String? chatRoomId = data['roomId'] as String? ?? data['chatRoomId'] as String?;
-  final String title = data['title'] ?? 'ICS Messenger';
+  final String title = data['title'] ?? 'IVY Messenger';
   final String body = data['body'] ?? 'You have a new message';
 
   // The ID is based on the chat room. This is the key to making notifications replace each other.
@@ -205,7 +205,7 @@ class _ICSAppState extends State<ICSApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ICS Messenger',
+      title: 'IVY Messenger',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue),
       home: SafeArea(

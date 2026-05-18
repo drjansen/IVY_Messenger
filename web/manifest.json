@@ -1,11 +1,11 @@
 {
-    "name": "ics_messenger_app",
-    "short_name": "ics_messenger_app",
+    "name": "IVY Messenger",
+    "short_name": "IVY Messenger",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "ICS Parent Messenger App",
+    "description": "IVY Messenger App",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

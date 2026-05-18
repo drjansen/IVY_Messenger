@@ -114,7 +114,7 @@ class DevicePolicyService {
     } on ArgumentError catch (e) {
       assert(() {
         // ignore: avoid_print
-        print('⚠️ DevicePolicyService: ${e.message}');
+        print('⚠️ DevicePolicyService: invalid test configuration: ${e.message}');
         return true;
       }());
       return DevicePolicyResult.error;
@@ -244,6 +244,7 @@ class DevicePolicyService {
   /// Exposed for unit testing only.
   static String generateUuidV4ForTesting() => _generateUuidV4();
 
+  /// Builds an optional device-info override from test-injected parameters.
   static _DeviceInfo? _resolveCustomDeviceInfo({
     required String? deviceName,
     required String? platform,

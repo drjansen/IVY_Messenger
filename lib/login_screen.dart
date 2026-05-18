@@ -128,9 +128,9 @@ class _LoginScreenState extends State<LoginScreen> {
     // session has already been superseded by a newer login on another device.
     setState(() => loading = true);
 
-    // Guard: userId must be populated by a successful login before reaching here.
-    final userId = MatrixService.userId;
-    if (userId.isEmpty) {
+    // Guard: the Rocket.Chat session headers must be populated by a successful
+    // login before reaching here.
+    if (MatrixService.userId.isEmpty || MatrixService.authToken.isEmpty) {
       await MatrixService.clearSession();
       setState(() {
         loading = false;
@@ -139,10 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final policyResult = await DevicePolicyService.checkDevicePolicy(
-      userId: userId,
-      username: username,
-    );
+    final policyResult = await DevicePolicyService.checkDevicePolicy();
 
     if (!mounted) return;
 

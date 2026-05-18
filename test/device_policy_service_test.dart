@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ics_messenger_app/device_policy_service.dart';
 
@@ -20,6 +24,63 @@ void main() {
       };
       // All 20 generated IDs should be unique.
       expect(ids.length, 20);
+    });
+  });
+
+  group('DevicePolicyService session registration', () {
+    test(
+      'checkDevicePolicy sends Rocket.Chat session headers and only device metadata',
+      () async {
+        final client = MockClient((request) async {
+          expect(
+            request.url.toString(),
+            'https://apppolicy.icsportals.org/session/register',
+          );
+          expect(request.method, 'POST');
+          expect(request.headers['Content-Type'], 'application/json');
+          expect(request.headers['X-App-Policy-Key'], isNotEmpty);
+          expect(request.headers['X-Auth-Token'], 'auth-token');
+          expect(request.headers['X-User-Id'], 'user-id');
+
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['device_id'], 'device-123');
+          expect(body['device_name'], 'Pixel 9');
+          expect(body['platform'], 'android');
+          expect(body['app_version'], '1.0.1');
+          expect(body.containsKey('user_id'), isFalse);
+          expect(body.containsKey('username'), isFalse);
+
+          return http.Response('{}', 200);
+        });
+
+        final result = await DevicePolicyService.checkDevicePolicy(
+          client: client,
+          authToken: 'auth-token',
+          sessionUserId: 'user-id',
+          deviceId: 'device-123',
+          deviceName: 'Pixel 9',
+          platform: 'android',
+        );
+
+        expect(result, DevicePolicyResult.allowed);
+      },
+    );
+
+    test('checkDevicePolicy fails closed when session headers are missing', () async {
+      final client = MockClient((request) async {
+        fail('HTTP client should not be called when session headers are missing');
+      });
+
+      final result = await DevicePolicyService.checkDevicePolicy(
+        client: client,
+        authToken: '',
+        sessionUserId: 'user-id',
+        deviceId: 'device-123',
+        deviceName: 'Pixel 9',
+        platform: 'android',
+      );
+
+      expect(result, DevicePolicyResult.error);
     });
   });
 }

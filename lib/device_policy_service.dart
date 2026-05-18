@@ -32,8 +32,6 @@ enum DevicePolicyResult {
 ///
 /// ## What data is collected
 /// Only the minimum set required by the policy backend:
-/// - `user_id`   – the Rocket.Chat user-ID returned after login (already in-session)
-/// - `username`  – the Rocket.Chat username (already in-session)
 /// - `device_id` – a random, app-installation-specific UUID generated locally on
 ///                  first launch and persisted in the platform secure keystore.
 ///                  It is **not** a hardware identifier and carries no PII.
@@ -82,36 +80,54 @@ class DevicePolicyService {
 
   /// Checks the device-policy endpoint for the authenticated user.
   ///
-  /// Must be called **after** a successful Rocket.Chat login so that
-  /// [userId] and [username] are available.
+  /// Must be called **after** a successful Rocket.Chat login so that the
+  /// current Rocket.Chat session headers are available.
   ///
   /// Returns:
   /// - [DevicePolicyResult.allowed]  → backend accepted the current session
   /// - [DevicePolicyResult.revoked]  → backend reports this session is superseded
   /// - [DevicePolicyResult.error]    → transport/server error; caller decides
   static Future<DevicePolicyResult> checkDevicePolicy({
-    required String userId,
-    required String username,
+    http.Client? client,
+    String? authToken,
+    String? sessionUserId,
+    String? deviceId,
+    String? deviceName,
+    String? platform,
   }) async {
+    final resolvedAuthToken = authToken ?? MatrixService.rocketchatAuthToken;
+    final resolvedUserId = sessionUserId ?? MatrixService.rocketchatUserId;
+    if (resolvedAuthToken.isEmpty || resolvedUserId.isEmpty) {
+      assert(() {
+        // ignore: avoid_print
+        print('⚠️ DevicePolicyService: missing Rocket.Chat session headers');
+        return true;
+      }());
+      return DevicePolicyResult.error;
+    }
+
+    final requestClient = client ?? http.Client();
     try {
-      final deviceId = await getOrCreateDeviceId();
-      final deviceInfo = await getDeviceInfo();
+      final resolvedDeviceId = deviceId ?? await getOrCreateDeviceId();
+      final resolvedDeviceInfo = deviceName != null && platform != null
+          ? _DeviceInfo(deviceName: deviceName, platform: platform)
+          : await getDeviceInfo();
 
       final payload = <String, String>{
-        'user_id': userId,
-        'username': username,
-        'device_id': deviceId,
-        'device_name': deviceInfo.deviceName,
-        'platform': deviceInfo.platform,
+        'device_id': resolvedDeviceId,
+        'device_name': resolvedDeviceInfo.deviceName,
+        'platform': resolvedDeviceInfo.platform,
         'app_version': _appVersion,
       };
 
-      final resp = await http
+      final resp = await requestClient
           .post(
             Uri.parse('$_policyBaseUrl$_checkPath'),
             headers: {
               'Content-Type': 'application/json',
               'X-App-Policy-Key': _policyApiKey,
+              'X-Auth-Token': resolvedAuthToken,
+              'X-User-Id': resolvedUserId,
             },
             body: jsonEncode(payload),
           )
@@ -143,6 +159,10 @@ class DevicePolicyService {
         return true;
       }());
       return DevicePolicyResult.error;
+    } finally {
+      if (client == null) {
+        requestClient.close();
+      }
     }
   }
 

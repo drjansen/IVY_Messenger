@@ -7,6 +7,7 @@ class FirebaseBootstrap {
   static bool get isAvailable => _isAvailable;
 
   static Future<void> initialize() async {
+    _isAvailable = false;
     try {
       await Firebase.initializeApp();
       _isAvailable = true;

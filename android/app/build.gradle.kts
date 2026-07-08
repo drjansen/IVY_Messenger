@@ -13,6 +13,8 @@ val firebaseConfigFile = project.file("google-services.json")
 if (firebaseConfigFile.exists()) {
     apply(plugin = "com.google.gms.google-services")
 } else {
+    // Re-sync Gradle after adding android/app/google-services.json so the
+    // Google services plugin is applied to subsequent builds.
     logger.warn(
         "[WARN] android/app/google-services.json not found. " +
                 "Firebase will be disabled until you copy the local config from " +

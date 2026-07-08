@@ -1,6 +1,6 @@
 class AppConfig {
-  static const appDisplayName = 'Messenger Demo';
-  static const pushAppName = 'Messenger Demo';
+  static const appDisplayName = 'IVY Messenger';
+  static const pushAppName = 'IVY Messenger';
 
   static const chatBaseUrl = 'https://chat.example.com';
   static const policyBaseUrl = 'https://policy.example.com';

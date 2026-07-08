@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ics_messenger_app/matrix_service.dart';
+import 'package:ivy_messenger/matrix_service.dart';
 
 void main() {
   group('parseFailedLoginResponseForTesting', () {

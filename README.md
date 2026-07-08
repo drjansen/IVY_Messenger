@@ -19,14 +19,16 @@ A private school communication app built with Flutter, designed for parents and 
    - `chatBaseUrl` — your Rocket.Chat server URL
    - `policyBaseUrl`, `reportsBaseUrl`, `ptcBaseUrl` — your school's backend service URLs
    - `privacyPolicyUri` — link to your privacy policy
-   - `appPolicyKey` — your shared policy key
-3. Add your Firebase configuration:
-   - `android/app/google-services.json` — Android Firebase config
-   - `ios/Runner/GoogleService-Info.plist` — iOS Firebase config (if targeting iOS)
+   - `appPolicyKey` — your shared policy key (**treat this as sensitive and do not commit a real value**)
+3. Add your Firebase configuration locally (do **not** commit the real files):
+   - Copy `android/app/google-services.json.example` to `android/app/google-services.json` and replace every placeholder value.
+   - Add `ios/Runner/GoogleService-Info.plist` from your Firebase project if targeting iOS.
 4. Update the Android/iOS bundle/application identifiers if you plan to publish the app.
 5. Run `flutter pub get`.
 6. Run `flutter analyze` and `flutter test`.
 7. Run `flutter run` on a connected device or emulator.
+
+If the local Firebase config files are missing, the app now starts with push notifications disabled instead of trying to initialize Firebase with placeholder values.
 
 For Flutter help, see the [official documentation](https://docs.flutter.dev/).
 
@@ -37,8 +39,11 @@ This repository has been sanitized for public visibility. The following files co
 | File | What to replace |
 |------|----------------|
 | `lib/app_config.dart` | Backend URLs, privacy-policy URL, shared policy key |
-| `android/app/google-services.json` | Firebase Android configuration |
+| `android/app/google-services.json.example` | Firebase Android configuration template |
 | Platform bundle/app identifiers | If you plan to publish the app to an app store |
+
+The real `android/app/google-services.json` and `ios/Runner/GoogleService-Info.plist`
+files are now gitignored so maintainers can keep Firebase project-specific values local.
 
 ## Backend
 

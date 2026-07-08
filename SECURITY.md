@@ -172,7 +172,7 @@ or intermediate certificate public-key hash.  This requires:
 ---
 
 ### OPN-4 – Firebase API key not restricted (Low–Medium)
-**Location:** `android/app/google-services.json` (`YOUR_FIREBASE_API_KEY_HERE`)
+**Location:** local Firebase client config (`android/app/google-services.json`, copied from `android/app/google-services.json.example`)
 
 **Detail:** The client-side Firebase API key is present in the repository and
 in the compiled app. By itself this is expected and not a secret; however, if

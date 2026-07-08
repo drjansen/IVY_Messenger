@@ -7,7 +7,17 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
+}
+
+val firebaseConfigFile = project.file("google-services.json")
+if (firebaseConfigFile.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn(
+        "[WARN] android/app/google-services.json not found. " +
+                "Firebase will be disabled until you copy the local config from " +
+                "android/app/google-services.json.example."
+    )
 }
 
 // --- Release signing ---

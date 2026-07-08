@@ -26,6 +26,7 @@ import 'package:collection/collection.dart';
 
 import 'matrix_service.dart';
 import 'main.dart';
+import 'firebase_bootstrap.dart';
 import 'widgets/emoji_picker.dart';
 import 'app_config.dart';
 
@@ -412,9 +413,11 @@ class _ChatScreenState extends State<ChatScreen>
           (_) => _requestRefresh(debounce: const Duration(milliseconds: 400)),
     );
 
-    _fcmSub = FirebaseMessaging.onMessage.listen(
-          (_) => _requestRefresh(debounce: const Duration(milliseconds: 400)),
-    );
+    if (FirebaseBootstrap.isAvailable) {
+      _fcmSub = FirebaseMessaging.onMessage.listen(
+            (_) => _requestRefresh(debounce: const Duration(milliseconds: 400)),
+      );
+    }
   }
 
   @override

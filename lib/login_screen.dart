@@ -12,6 +12,7 @@ import 'password_policy_validator.dart';
 import 'session_manager.dart';
 import 'two_factor_screen.dart';
 import 'app_config.dart';
+import 'firebase_bootstrap.dart';
 
 class LoginScreen extends StatefulWidget {
   final String? sessionNoticeKey;
@@ -166,8 +167,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // policyResult == DevicePolicyResult.allowed – continue normal flow.
     await _saveCredentials();
-    await FirebaseMessaging.instance
-        .requestPermission(alert: true, badge: true, sound: true);
+    if (FirebaseBootstrap.isAvailable) {
+      await FirebaseMessaging.instance
+          .requestPermission(alert: true, badge: true, sound: true);
+    }
     await MatrixService.registerPushToken('');
 
     // Save session info centrally using SessionManager

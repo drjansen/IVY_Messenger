@@ -11,6 +11,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'main.dart'; // for routeObserver
 import 'chat_screen.dart';
 import 'matrix_service.dart';
+import 'firebase_bootstrap.dart';
 
 typedef TotalCountCallback = void Function(int totalUnread);
 
@@ -57,39 +58,41 @@ class _ChatRoomsTabState extends State<ChatRoomsTab>
     WidgetsBinding.instance.addObserver(this);
     _initializeRooms();
 
-    _fcmSub = FirebaseMessaging.onMessage.listen((msg) {
-      // Gate FCM payload inspection behind debug mode — message data and
-      // notification bodies must not appear in release logs.
-      if (kDebugMode) {
-        debugPrint('📩 FCM onMessage data: ${msg.data}');
-        debugPrint(
-            '📩 FCM onMessage notification: title=${msg.notification?.title} body=${msg.notification?.body}');
-      }
-
-      final rid = (msg.data['room_id'] ?? msg.data['rid']) as String?;
-      if (kDebugMode) {
-        debugPrint('📩 Parsed rid=$rid');
-      }
-
-      if (rid != null && mutedRooms[rid] != true) {
-        if (mounted) {
-          setState(() {
-            // ✅ For Option B we still increment locally so UI reacts immediately,
-            // but server polling will reconcile later.
-            unreadCounts[rid] = (unreadCounts[rid] ?? 0) + 1;
-            newMessageRooms.add(rid);
-          });
-        }
-        _notifyTotal();
-
-        // ✅ Trigger a background recompute soon-ish (throttled) so counts become accurate
-        _requestComputeForRoom(rid);
-      } else {
+    if (FirebaseBootstrap.isAvailable) {
+      _fcmSub = FirebaseMessaging.onMessage.listen((msg) {
+        // Gate FCM payload inspection behind debug mode — message data and
+        // notification bodies must not appear in release logs.
         if (kDebugMode) {
-          debugPrint('📩 No rid found or room muted; not incrementing unread.');
+          debugPrint('📩 FCM onMessage data: ${msg.data}');
+          debugPrint(
+              '📩 FCM onMessage notification: title=${msg.notification?.title} body=${msg.notification?.body}');
         }
-      }
-    });
+
+        final rid = (msg.data['room_id'] ?? msg.data['rid']) as String?;
+        if (kDebugMode) {
+          debugPrint('📩 Parsed rid=$rid');
+        }
+
+        if (rid != null && mutedRooms[rid] != true) {
+          if (mounted) {
+            setState(() {
+              // ✅ For Option B we still increment locally so UI reacts immediately,
+              // but server polling will reconcile later.
+              unreadCounts[rid] = (unreadCounts[rid] ?? 0) + 1;
+              newMessageRooms.add(rid);
+            });
+          }
+          _notifyTotal();
+
+          // ✅ Trigger a background recompute soon-ish (throttled) so counts become accurate
+          _requestComputeForRoom(rid);
+        } else {
+          if (kDebugMode) {
+            debugPrint('📩 No rid found or room muted; not incrementing unread.');
+          }
+        }
+      });
+    }
   }
 
   // ✅ NEW: Main initialization function

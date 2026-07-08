@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -11,6 +10,7 @@ import 'login_screen.dart';
 import 'main_screen.dart';
 import 'matrix_service.dart';
 import 'app_config.dart';
+import 'firebase_bootstrap.dart';
 
 // 1. ADD THIS CLASS TO TRACK THE CURRENTLY VIEWED CHAT ROOM
 class AppState {
@@ -55,7 +55,10 @@ Future<void> showSimpleNotification(RemoteMessage message) async {
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await FirebaseBootstrap.initialize();
+  if (!FirebaseBootstrap.isAvailable) {
+    return;
+  }
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
   final InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
 
@@ -80,22 +83,24 @@ void main() async {
   await initializeDateFormatting('ko_KR', null);
   Intl.defaultLocale = 'ko_KR';
 
-  await Firebase.initializeApp();
+  await FirebaseBootstrap.initialize();
   await EasyLocalization.ensureInitialized();
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  if (FirebaseBootstrap.isAvailable) {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  await FirebaseMessaging.instance.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
-  FirebaseMessaging.instance.getToken().then((token) {
-    if (token != null) {
-      // FCM token obtained — register with push server after login.
-    }
-  });
+    FirebaseMessaging.instance.getToken().then((token) {
+      if (token != null) {
+        // FCM token obtained — register with push server after login.
+      }
+    });
+  }
 
   bool sessionRestored = await MatrixService.restoreSession();
   if (sessionRestored) {
@@ -149,32 +154,34 @@ class _IVYAppState extends State<IVYApp> with WidgetsBindingObserver {
     );
 
     // 3. THIS LISTENER NOW CHECKS IF THE USER IS IN THE CHAT ROOM
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      final String? chatRoomId = message.data['roomId'] as String? ?? message.data['chatRoomId'] as String?;
+    if (FirebaseBootstrap.isAvailable) {
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        final String? chatRoomId = message.data['roomId'] as String? ?? message.data['chatRoomId'] as String?;
 
-      // Only show notification if the user is NOT in the chat room.
-      if (chatRoomId != AppState.currentChatRoomId) {
-        if (kDebugMode) {
-          print('🔔 [FCM] Foreground message for a different room. Showing notification.');
+        // Only show notification if the user is NOT in the chat room.
+        if (chatRoomId != AppState.currentChatRoomId) {
+          if (kDebugMode) {
+            print('🔔 [FCM] Foreground message for a different room. Showing notification.');
+          }
+          showSimpleNotification(message);
+        } else {
+          if (kDebugMode) {
+            print('🔔 [FCM] Foreground message for active room. Suppressing notification.');
+          }
         }
-        showSimpleNotification(message);
-      } else {
-        if (kDebugMode) {
-          print('🔔 [FCM] Foreground message for active room. Suppressing notification.');
-        }
-      }
-    });
+      });
 
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      final chatRoomId = message.data['roomId'] as String? ?? message.data['chatRoomId'] as String?;
-      if (chatRoomId != null) {
-        cancelNotificationForCurrentChat(chatRoomId);
-        // TODO: handle navigation to the chat
-      }
-      if (kDebugMode) {
-        print('🔔 [FCM] Notification tapped: ${message.messageId}');
-      }
-    });
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        final chatRoomId = message.data['roomId'] as String? ?? message.data['chatRoomId'] as String?;
+        if (chatRoomId != null) {
+          cancelNotificationForCurrentChat(chatRoomId);
+          // TODO: handle navigation to the chat
+        }
+        if (kDebugMode) {
+          print('🔔 [FCM] Notification tapped: ${message.messageId}');
+        }
+      });
+    }
   }
 
   void _onAuthEventNotice() {

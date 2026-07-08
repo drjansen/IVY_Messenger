@@ -32,6 +32,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/android/build/
 
 # Symbolication related
 app.*.symbols
@@ -45,6 +46,8 @@ app.*.map.json
 /android/app/release
 
 # Sensitive credential and key files — never commit these
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
 *_Broken.json
 *_OLD.json
 *_BACKUP.json

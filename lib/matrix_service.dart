@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show ValueNotifier, kIsWeb;
 import 'session_manager.dart';
 import 'app_config.dart';
+import 'firebase_bootstrap.dart';
 
 enum MatrixLoginStatus {
   success,
@@ -1166,7 +1167,7 @@ class MatrixService {
   }
 
   static Future<void> registerPushToken(String _) async {
-    if (kIsWeb) return;
+    if (kIsWeb || !FirebaseBootstrap.isAvailable) return;
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) return;
 

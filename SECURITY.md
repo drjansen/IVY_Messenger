@@ -18,7 +18,7 @@ This document summarises the security findings from the initial review
 > **Immediate action required (outside this PR):**
 > 1. Go to [Google Cloud Console → IAM & Admin → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
 >    and find the service account `firebase-adminsdk-fbsvc@<your-project>.iam.gserviceaccount.com`.
-> 2. Delete (revoke) the exposed key with ID `[REDACTED]`.
+> 2. Delete (revoke) the exposed key with ID **`8ab959a5b4b3ff04b3d99c57b87d905dc0b5f517`**.
 > 3. If the service account is still needed, generate a **new** key and store it securely
 >    — never commit it to version control.
 > 4. Audit Google Cloud / Firebase audit logs for any unauthorised access since the key

@@ -12,7 +12,6 @@ class FirebaseBootstrap {
       await Firebase.initializeApp();
       _isAvailable = true;
     } on FirebaseException catch (error) {
-      _isAvailable = false;
       assert(() {
         debugPrint(
           'Firebase initialization skipped. Add local platform config files to enable push notifications: $error',
@@ -20,7 +19,6 @@ class FirebaseBootstrap {
         return true;
       }());
     } catch (error) {
-      _isAvailable = false;
       assert(() {
         debugPrint(
           'Firebase initialization skipped due to an unexpected error. Add local platform config files to enable push notifications: $error',

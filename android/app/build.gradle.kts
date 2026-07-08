@@ -17,8 +17,8 @@ if (firebaseConfigFile.exists()) {
     // Google services plugin is applied to subsequent builds.
     logger.warn(
         "android/app/google-services.json not found. " +
-                "Firebase will be disabled until you copy the local config from " +
-                "android/app/google-services.json.example."
+            "Firebase will be disabled until you copy the local config from " +
+            "android/app/google-services.json.example."
     )
 }
 

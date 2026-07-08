@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ics_messenger_app/device_policy_service.dart';
+import 'package:ics_messenger_app/app_config.dart';
 
 void main() {
   group('DevicePolicyService UUID generation', () {
@@ -34,7 +35,7 @@ void main() {
         final client = MockClient((request) async {
           expect(
             request.url.toString(),
-            'https://apppolicy.icsportals.org/session/register',
+            '${AppConfig.policyBaseUrl}/session/register',
           );
           expect(request.method, 'POST');
           expect(request.headers['Content-Type'], 'application/json');
@@ -107,7 +108,7 @@ void main() {
       final client = MockClient((request) async {
         expect(
           request.url.toString(),
-          'https://apppolicy.icsportals.org/session/status',
+          '${AppConfig.policyBaseUrl}/session/status',
         );
         expect(request.method, 'POST');
         expect(request.headers['Content-Type'], 'application/json');
@@ -144,7 +145,7 @@ void main() {
         expect(request.method, 'GET');
         expect(
           request.url.toString(),
-          'https://apppolicy.icsportals.org/session/status?device_id=device-123',
+          '${AppConfig.policyBaseUrl}/session/status?device_id=device-123',
         );
         expect(request.headers['X-App-Policy-Key'], isNotEmpty);
         expect(request.headers['X-Auth-Token'], 'auth-token');
@@ -172,7 +173,7 @@ void main() {
         expect(request.url.queryParameters['device_id'], 'device id&123');
         expect(
           request.url.toString(),
-          'https://apppolicy.icsportals.org/session/status?device_id=device+id%26123',
+          '${AppConfig.policyBaseUrl}/session/status?device_id=device+id%26123',
         );
         return http.Response('{}', 200);
       });

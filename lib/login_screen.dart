@@ -11,6 +11,7 @@ import 'password_reset_service.dart';
 import 'password_policy_validator.dart';
 import 'session_manager.dart';
 import 'two_factor_screen.dart';
+import 'app_config.dart';
 
 class LoginScreen extends StatefulWidget {
   final String? sessionNoticeKey;
@@ -27,7 +28,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static final Uri _privacyPolicyUri = Uri.parse('https://privacy.icsportals.org/');
+  static final Uri _privacyPolicyUri = AppConfig.privacyPolicyUri;
 
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();

@@ -1,16 +1,20 @@
 # ics_messenger_app
 
-IVY Messenger App
+Public-safe messenger demo application built with Flutter.
+
+## Public release placeholders
+
+This repository has been sanitized for public visibility. Before using it in a real environment, replace the placeholder values in:
+
+- `lib/app_config.dart` for backend URLs, the privacy-policy URL, and the shared policy key
+- `android/app/google-services.json` for Firebase Android configuration
+- your platform bundle/application identifiers if you plan to publish the app
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+1. Install the Flutter SDK.
+2. Replace the placeholder configuration values with your own environment-specific settings.
+3. Run `flutter pub get`.
+4. Run `flutter analyze` and `flutter test`.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+For Flutter help, see the [official documentation](https://docs.flutter.dev/).

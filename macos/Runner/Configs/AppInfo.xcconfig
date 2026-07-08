@@ -8,7 +8,7 @@
 PRODUCT_NAME = ics_messenger_app
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = app.icsportals.icsMessengerApp
+PRODUCT_BUNDLE_IDENTIFIER = com.example.messengerDemo
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2025 app.icsportals. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2025 Example Organization. All rights reserved.

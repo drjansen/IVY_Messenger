@@ -27,6 +27,7 @@ import 'package:collection/collection.dart';
 import 'matrix_service.dart';
 import 'main.dart';
 import 'widgets/emoji_picker.dart';
+import 'app_config.dart';
 
 Future<bool> requestStoragePermission() async {
   if (kIsWeb) {
@@ -478,7 +479,7 @@ class _ChatScreenState extends State<ChatScreen>
         usernames: namesToLookup,
         authToken: MatrixService.authToken,
         userId: MatrixService.userId,
-        baseUrl: 'https://app.icsportals.org',
+        baseUrl: AppConfig.chatBaseUrl,
       );
 
       for (final username in namesToLookup) {
@@ -486,7 +487,7 @@ class _ChatScreenState extends State<ChatScreen>
           username: username,
           authToken: MatrixService.authToken,
           userId: MatrixService.userId,
-          baseUrl: 'https://app.icsportals.org',
+          baseUrl: AppConfig.chatBaseUrl,
         );
         _realNameCache[username] = realName;
       }
@@ -551,7 +552,7 @@ class _ChatScreenState extends State<ChatScreen>
             username: username,
             authToken: MatrixService.authToken,
             userId: MatrixService.userId,
-            baseUrl: 'https://app.icsportals.org',
+            baseUrl: AppConfig.chatBaseUrl,
           );
           _realNameCache[username] = realName;
           UserNameCache.setRealName(username, realName);

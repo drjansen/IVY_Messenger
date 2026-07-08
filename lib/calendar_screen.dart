@@ -6,6 +6,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'matrix_service.dart';
 import 'session_manager.dart';
+import 'app_config.dart';
 
 class CalendarEvent {
   final String title;
@@ -123,7 +124,7 @@ class _CalendarScreenState extends State<CalendarScreen> with TickerProviderStat
         });
         return;
       }
-      final uri = Uri.parse('https://reports.icsportals.org/calendar/roles/$username');
+      final uri = Uri.parse('${AppConfig.reportsBaseUrl}/calendar/roles/$username');
       final response = await http.get(uri, headers: _buildAuthHeaders());
       await MatrixService.handlePotentialRevokedSessionResponse(response);
       if (response.statusCode == 200) {
@@ -188,7 +189,7 @@ class _CalendarScreenState extends State<CalendarScreen> with TickerProviderStat
         return;
       }
 
-      final uri = Uri.parse('https://reports.icsportals.org/calendar/events/$username');
+      final uri = Uri.parse('${AppConfig.reportsBaseUrl}/calendar/events/$username');
       final response = await http.get(uri, headers: _buildAuthHeaders());
       await MatrixService.handlePotentialRevokedSessionResponse(response);
       if (response.statusCode == 200) {

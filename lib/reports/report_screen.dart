@@ -7,6 +7,7 @@ import '../matrix_service.dart';
 import 'package:ics_messenger_app/session_manager.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:intl/intl.dart';
+import '../app_config.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({Key? key}) : super(key: key);
@@ -166,7 +167,7 @@ class _ReportScreenState extends State<ReportScreen> {
     setState(() => submitting = true);
 
     try {
-      var uri = Uri.parse('https://reports.icsportals.org/submit-report/');
+      var uri = Uri.parse('${AppConfig.reportsBaseUrl}/submit-report/');
       var request = http.MultipartRequest('POST', uri);
 
       request.headers['X-Auth-Token'] = _authToken!;

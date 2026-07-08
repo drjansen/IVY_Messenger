@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'matrix_service.dart';
+import 'app_config.dart';
 
 class PtcScreen extends StatefulWidget {
   const PtcScreen({Key? key}) : super(key: key);
@@ -14,7 +15,7 @@ class PtcScreen extends StatefulWidget {
 }
 
 class _PtcScreenState extends State<PtcScreen> {
-  static const String _ptcBaseUrl = 'https://ptc.icsportals.org';
+  static const String _ptcBaseUrl = AppConfig.ptcBaseUrl;
 
   bool _loading = true;
   bool _active = false;

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'matrix_service.dart';
 import 'session_manager.dart';
+import 'app_config.dart';
 
 // --- Models ---
 
@@ -171,7 +172,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     final username = SessionManager.username;
     if (username == null) return SchoolType.none;
     try {
-      final uri = Uri.parse('https://reports.icsportals.org/calendar/roles/$username');
+      final uri = Uri.parse('${AppConfig.reportsBaseUrl}/calendar/roles/$username');
       final response = await http.get(uri, headers: _buildAuthHeaders());
       await MatrixService.handlePotentialRevokedSessionResponse(response);
       if (response.statusCode == 200) {
@@ -206,7 +207,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       cachedAnnouncements = cachedList.map((json) => Announcement.fromJson(json)).toList();
     }
 
-    final uri = Uri.parse('https://reports.icsportals.org/announcements');
+    final uri = Uri.parse('${AppConfig.reportsBaseUrl}/announcements');
     try {
       final response = await http.get(uri, headers: _buildAuthHeaders());
       await MatrixService.handlePotentialRevokedSessionResponse(response);
@@ -243,7 +244,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       return [];
     }
 
-    final uri = Uri.parse('https://reports.icsportals.org/children_attendance/$username');
+    final uri = Uri.parse('${AppConfig.reportsBaseUrl}/children_attendance/$username');
     final response = await http.get(uri, headers: _buildAuthHeaders());
     await MatrixService.handlePotentialRevokedSessionResponse(response);
     if (response.statusCode == 200) {
@@ -270,7 +271,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   Future<LunchMenu> fetchLunchMenu() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final uri = Uri.parse('https://reports.icsportals.org/lunch_menu/today');
+    final uri = Uri.parse('${AppConfig.reportsBaseUrl}/lunch_menu/today');
     try {
       final response = await http.get(uri, headers: _buildAuthHeaders());
       await MatrixService.handlePotentialRevokedSessionResponse(response);
@@ -305,7 +306,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       final schoolType = await _fetchUserSchoolType();
       _userSchoolType = schoolType;
 
-      final eventsUri = Uri.parse('https://reports.icsportals.org/calendar/events/$username');
+      final eventsUri = Uri.parse('${AppConfig.reportsBaseUrl}/calendar/events/$username');
       final eventsResp = await http.get(eventsUri, headers: _buildAuthHeaders());
       await MatrixService.handlePotentialRevokedSessionResponse(eventsResp);
       if (eventsResp.statusCode != 200) {
@@ -556,9 +557,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 String? fullImageUrl;
                 if (menu?.imageUrl != null && menu!.imageUrl!.isNotEmpty) {
                   if (menu.imageUrl!.startsWith('/')) {
-                    fullImageUrl = 'https://reports.icsportals.org${menu.imageUrl!}';
+                    fullImageUrl = '${AppConfig.reportsBaseUrl}${menu.imageUrl!}';
                   } else if (!menu.imageUrl!.startsWith('http')) {
-                    fullImageUrl = 'https://reports.icsportals.org/lunch_menu_images/${menu.imageUrl!}';
+                    fullImageUrl = '${AppConfig.reportsBaseUrl}/lunch_menu_images/${menu.imageUrl!}';
                   } else {
                     fullImageUrl = menu.imageUrl!;
                   }

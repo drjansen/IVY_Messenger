@@ -10,6 +10,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show ValueNotifier, kIsWeb;
 import 'session_manager.dart';
+import 'app_config.dart';
 
 enum MatrixLoginStatus {
   success,
@@ -35,7 +36,7 @@ class MatrixLoginResult {
 }
 
 class MatrixService {
-  static const _baseUrl = 'https://app.icsportals.org';
+  static const _baseUrl = AppConfig.chatBaseUrl;
   static late String _authToken;
   static late String _userId;
 
@@ -1175,7 +1176,7 @@ class MatrixService {
         body: jsonEncode({
           'type': 'gcm',
           'value': token,
-          'appName': 'ICS Messenger',
+          'appName': AppConfig.pushAppName,
         }),
       );
     } catch (e) {

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'matrix_service.dart';
+import 'app_config.dart';
 
 /// Result of a device-policy check call to the policy backend.
 enum DevicePolicyResult {
@@ -23,7 +24,7 @@ enum DevicePolicyResult {
   revoked,
 }
 
-/// Integrates with the ICS messenger-app policy backend.
+/// Integrates with the example messenger policy backend.
 ///
 /// The backend tracks single-device session ownership and signals explicit
 /// revocation responses when a newer login supersedes this session. This class
@@ -46,10 +47,10 @@ enum DevicePolicyResult {
 class DevicePolicyService {
   // ── Backend configuration ────────────────────────────────────────────────
 
-  /// Base URL of the ICS messenger-app policy backend.
+  /// Base URL of the example messenger policy backend.
   ///
   /// Override this constant when deploying to a different environment.
-  static const _policyBaseUrl = 'https://apppolicy.icsportals.org';
+  static const _policyBaseUrl = AppConfig.policyBaseUrl;
 
   /// The path of the session registration endpoint.
   static const _registerPath = '/session/register';
@@ -63,7 +64,7 @@ class DevicePolicyService {
   /// header before forwarding any request.  Because this is an internal,
   /// closed-distribution app the key is embedded here; treat it as you would
   /// any low-privilege service credential (rotate on compromise).
-  static const _policyApiKey = 'cd1fb10a79134e4d50f1da91f0bf1eb7e49deb6403b1be59116aca0e28fe3e15';
+  static const _policyApiKey = AppConfig.appPolicyKey;
 
   // ── App metadata ─────────────────────────────────────────────────────────
 

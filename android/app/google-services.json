@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "340214058572",
-    "project_id": "ics-messenger-diosa",
-    "storage_bucket": "ics-messenger-diosa.firebasestorage.app"
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "YOUR_PROJECT_ID",
+    "storage_bucket": "YOUR_PROJECT_ID.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:340214058572:android:ab333dd1fdfdb97be7eee9",
+        "mobilesdk_app_id": "YOUR_MOBILE_SDK_APP_ID",
         "android_client_info": {
-          "package_name": "app.icsportals.ics_messenger_app"
+          "package_name": "com.example.messenger_demo"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDj54SkdfNfde1EuwOHXc4D2pDc3qYLyUE"
+          "current_key": "YOUR_FIREBASE_API_KEY_HERE"
         }
       ],
       "services": {

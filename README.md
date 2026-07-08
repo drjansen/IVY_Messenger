@@ -28,7 +28,9 @@ A private school communication app built with Flutter, designed for parents and 
 6. Run `flutter analyze` and `flutter test`.
 7. Run `flutter run` on a connected device or emulator.
 
-If the local Firebase config files are missing, the app now starts with push notifications disabled instead of trying to initialize Firebase with placeholder values.
+If the local Firebase config files are missing, the app now starts with push
+notifications disabled. It does not try to initialize Firebase with placeholder
+values.
 
 For Flutter help, see the [official documentation](https://docs.flutter.dev/).
 

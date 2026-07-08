@@ -10,7 +10,7 @@ class FirebaseBootstrap {
     try {
       await Firebase.initializeApp();
       _isAvailable = true;
-    } catch (error) {
+    } on FirebaseException catch (error) {
       _isAvailable = false;
       assert(() {
         debugPrint(

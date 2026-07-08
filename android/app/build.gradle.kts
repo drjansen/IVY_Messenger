@@ -22,7 +22,7 @@ if (keyPropertiesFile.exists()) {
 }
 
 android {
-    namespace = "app.icsportals.ics_messenger_app"
+    namespace = "com.example.messenger_demo"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 
@@ -33,7 +33,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "app.icsportals.ics_messenger_app"
+        applicationId = "com.example.messenger_demo"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = 24

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'app_config.dart';
 
 /// Result of a password-reset *request* call.
 enum PasswordResetRequestResult {
@@ -21,7 +22,7 @@ enum PasswordResetConfirmResult {
   failure,
 }
 
-/// Service that integrates with the ICS policy-backend password-reset API.
+/// Service that integrates with the example password-reset API.
 ///
 /// Endpoint base URL and API-key follow the same pattern used by
 /// [DevicePolicyService].  All HTTP calls are intentionally kept here so
@@ -30,11 +31,11 @@ class PasswordResetService {
   // ── Backend configuration ─────────────────────────────────────────────────
 
   /// Base URL shared with the device-policy backend.
-  static const _policyBaseUrl = 'https://apppolicy.icsportals.org';
+  static const _policyBaseUrl = AppConfig.policyBaseUrl;
 
   /// Pre-shared API key required by the Nginx reverse-proxy layer.
   static const _policyApiKey =
-      'cd1fb10a79134e4d50f1da91f0bf1eb7e49deb6403b1be59116aca0e28fe3e15';
+      AppConfig.appPolicyKey;
 
   static const _requestPath = '/password-reset/request';
   static const _confirmPath = '/password-reset/confirm';

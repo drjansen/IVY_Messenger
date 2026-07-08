@@ -1,11 +1,11 @@
 {
-    "name": "IVY Messenger",
-    "short_name": "IVY Messenger",
+    "name": "Messenger Demo",
+    "short_name": "Messenger Demo",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "IVY Messenger App",
+    "description": "Public-safe messenger demo app",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

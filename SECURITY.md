@@ -1,4 +1,4 @@
-# Security Notes – IVY Messenger App
+# Security Notes – Messenger Demo
 
 This document summarises the security findings from the initial review
 (May 2026) and tracks the status of each item.
@@ -9,7 +9,7 @@ This document summarises the security findings from the initial review
 
 | # | Severity | Finding | Fix |
 |---|----------|---------|-----|
-| 1 | **Critical** | Firebase Admin SDK service-account private key committed to git (`google-services_Broken.json`) | File deleted from repo; patterns added to `.gitignore`. **Action required: immediately revoke key `8ab959a5...` in the Firebase / Google Cloud Console.** |
+| 1 | **Critical** | Firebase Admin SDK service-account private key committed to git (`google-services_Broken.json`) | File deleted from repo; patterns added to `.gitignore`. **Action required: immediately revoke key `[REDACTED]` in the Firebase / Google Cloud Console.** |
 | 2 | **Critical** | Redundant Firebase config backup (`google-services_OLD.json`) committed to repo | File deleted from repo. |
 | 3 | **High** | Plaintext user password stored in `SharedPreferences` ("Remember Me" feature) | Password storage removed entirely. Only the username (non-secret) is retained as a UI convenience. |
 | 4 | **High** | Session auth tokens (`matrix_auth_token`, `rocketchat_auth_token`, `rocketchat_user_id`) stored unencrypted in `SharedPreferences` | Migrated to `flutter_secure_storage` (Android Keystore / iOS Keychain). A one-time migration transparently moves existing tokens on first launch. |
@@ -104,7 +104,7 @@ endpoint so the main auth token is never embedded in a URL.
 `lib/ptc_screen.dart`, `lib/reports/report_screen.dart`
 
 **Detail:** The Rocket.Chat session token (`X-Auth-Token` / `X-User-Id`) is
-forwarded directly to `reports.icsportals.org` and `ptc.icsportals.org`. This
+forwarded directly to `reports.example.com` and `ptc.example.com`. This
 expands the trust boundary: compromise of any one service can expose a token
 that is valid across all services.
 
@@ -113,7 +113,7 @@ changes. Introducing fake service-specific tokens in the client would provide
 no real security benefit.
 
 **Remaining fix:** Implement audience-scoped, short-lived tokens per service on
-the backend. The Rocket.Chat token should never leave the `app.icsportals.org`
+the backend. The Rocket.Chat token should never leave the `chat.example.com`
 domain. Consider a backend token-exchange endpoint that issues service-scoped
 JWT tokens in response to a valid Rocket.Chat session proof.
 
@@ -125,7 +125,7 @@ JWT tokens in response to a valid Rocket.Chat session proof.
 
 **Detail:** The app trusts the device's system CA store. On a device with a
 custom CA installed (e.g. corporate MDM, or a compromised device) traffic to
-`app.icsportals.org` and `reports.icsportals.org` could be intercepted.
+`chat.example.com` and `reports.example.com` could be intercepted.
 
 **What was improved (PR #2):** The Android network security config excludes
 user-installed CA certificates from the trust store in release builds, which
@@ -141,7 +141,7 @@ or intermediate certificate public-key hash.  This requires:
 ---
 
 ### OPN-4 – Firebase API key not restricted (Low–Medium)
-**Location:** `android/app/google-services.json` (`AIzaSyDj54Sk...`)
+**Location:** `android/app/google-services.json` (`YOUR_FIREBASE_API_KEY_HERE`)
 
 **Detail:** The client-side Firebase API key is present in the repository and
 in the compiled app. By itself this is expected and not a secret; however, if
@@ -153,7 +153,7 @@ the key is not restricted in the Firebase / Google Cloud Console to:
 …then it can be misused by anyone who reads the APK.
 
 **Recommended fix:** In the Google Cloud Console → Credentials, restrict the
-key to the package name `app.icsportals.ics_messenger_app` and the production
+key to the package name `com.example.messenger_demo` and the production
 signing certificate SHA-1. Note: the SHA-1 of the production signing cert will
 change once you migrate away from the debug signing config (fix #14 above).
 Update the Firebase key restriction after deploying the new release keystore.

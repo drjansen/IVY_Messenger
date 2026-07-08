@@ -1,5 +1,5 @@
 name: ics_messenger_app
-description: "ICS Parent Messenger App"
+description: "Public-safe messenger demo application"
 publish_to: 'none'
 
 version: 1.0.1+3

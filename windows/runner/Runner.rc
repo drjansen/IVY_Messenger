@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "app.icsportals" "\0"
-            VALUE "FileDescription", "ics_messenger_app" "\0"
+            VALUE "CompanyName", "Example Organization" "\0"
+            VALUE "FileDescription", "Messenger Demo" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "ics_messenger_app" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 app.icsportals. All rights reserved." "\0"
-            VALUE "OriginalFilename", "ics_messenger_app.exe" "\0"
-            VALUE "ProductName", "ics_messenger_app" "\0"
+            VALUE "InternalName", "messenger_demo" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 Example Organization. All rights reserved." "\0"
+            VALUE "OriginalFilename", "messenger_demo.exe" "\0"
+            VALUE "ProductName", "Messenger Demo" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

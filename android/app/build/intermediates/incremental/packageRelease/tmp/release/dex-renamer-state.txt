@@ -1,4 +1,0 @@
-#Thu May 15 09:22:04 GMT+09:00 2025
-base.0=C\:\\Users\\userp\\ics_messenger_app\\android\\app\\build\\intermediates\\dex\\release\\minifyReleaseWithR8\\classes.dex
-path.0=classes.dex
-renamed.0=classes.dex

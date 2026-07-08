@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ics_messenger_app/device_policy_service.dart';
-import 'package:ics_messenger_app/app_config.dart';
+import 'package:ivy_messenger/device_policy_service.dart';
+import 'package:ivy_messenger/app_config.dart';
 
 void main() {
   group('DevicePolicyService UUID generation', () {

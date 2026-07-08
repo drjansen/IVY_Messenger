@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ics_messenger_app/password_reset_service.dart';
+import 'package:ivy_messenger/password_reset_service.dart';
 
 void main() {
   group('PasswordResetService – input validation (no network required)', () {

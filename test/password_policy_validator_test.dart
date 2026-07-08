@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ics_messenger_app/password_policy_validator.dart';
+import 'package:ivy_messenger/password_policy_validator.dart';
 
 void main() {
   group('PasswordPolicyValidator.validateResetPassword', () {

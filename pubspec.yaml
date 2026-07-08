@@ -1,5 +1,5 @@
-name: ics_messenger_app
-description: "Public-safe messenger demo application"
+name: ivy_messenger
+description: "IVY Messenger – a private school communication app for parents and teachers, powered by Rocket.Chat."
 publish_to: 'none'
 
 version: 1.0.1+3

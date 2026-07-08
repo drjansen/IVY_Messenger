@@ -108,20 +108,20 @@ void main() async {
       path: 'assets/langs',
       fallbackLocale: const Locale('ko'),
       startLocale: const Locale('ko'),
-      child: ICSApp(sessionRestored: sessionRestored),
+      child: IVYApp(sessionRestored: sessionRestored),
     ),
   );
 }
 
-class ICSApp extends StatefulWidget {
+class IVYApp extends StatefulWidget {
   final bool sessionRestored;
-  const ICSApp({Key? key, required this.sessionRestored}) : super(key: key);
+  const IVYApp({Key? key, required this.sessionRestored}) : super(key: key);
 
   @override
-  State<ICSApp> createState() => _ICSAppState();
+  State<IVYApp> createState() => _IVYAppState();
 }
 
-class _ICSAppState extends State<ICSApp> with WidgetsBindingObserver {
+class _IVYAppState extends State<IVYApp> with WidgetsBindingObserver {
   late bool _sessionRestored;
   String? _sessionNoticeKey;
 

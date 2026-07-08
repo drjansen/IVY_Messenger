@@ -1,11 +1,11 @@
 {
-    "name": "Messenger Demo",
-    "short_name": "Messenger Demo",
+    "name": "IVY Messenger",
+    "short_name": "IVY Messenger",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Public-safe messenger demo app",
+    "description": "IVY Messenger – private school communication app for parents and teachers",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

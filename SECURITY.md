@@ -5,11 +5,42 @@ This document summarises the security findings from the initial review
 
 ---
 
+## ✅ Fixed in PR #4 (Google Cloud credential exposure notification + ICS branding cleanup)
+
+> **⚠️ URGENT – credential rotation required by repo owner.**
+>
+> Google Cloud sent an automated abuse notification confirming that the Firebase Admin SDK
+> service-account private key previously committed to this repository was detected in a
+> public GitHub URL.  The key has been removed from the current working tree (see PR #1
+> below), but the raw credential **still exists in git history** and must be treated as
+> **fully compromised**.
+>
+> **Immediate action required (outside this PR):**
+> 1. Go to [Google Cloud Console → IAM & Admin → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
+>    and find the service account `firebase-adminsdk-fbsvc@<your-project>.iam.gserviceaccount.com`.
+> 2. Delete (revoke) the exposed key with ID **`8ab959a5b4b3ff04b3d99c57b87d905dc0b5f517`**.
+> 3. If the service account is still needed, generate a **new** key and store it securely
+>    — never commit it to version control.
+> 4. Audit Google Cloud / Firebase audit logs for any unauthorised access since the key
+>    was first committed.
+> 5. Consider a full git-history rewrite (`git filter-repo` or BFG Repo Cleaner) to purge
+>    the credential from history, then force-push and rotate all collaborator forks.
+>
+> This PR only removes the secret from the current tracked files.  It does **not** rewrite
+> git history.
+
+| # | Severity | Finding | Fix |
+|---|----------|---------|-----|
+| 21 | **Critical** | Google Cloud sent an automated abuse notification confirming `google-services_Broken.json` (deleted in PR #1) exposed a Firebase Admin SDK service-account private key in a public commit (`25e35d3`). | No new tracked file changes required — file was already deleted and `.gitignore` patterns already in place. SECURITY.md updated with explicit credential-rotation instructions. Remaining ICS/`ics_messenger_app` branding references neutralised in platform files. |
+| 22 | **Low** | `windows/runner/main.cpp` window title and `macos/Runner/Configs/AppInfo.xcconfig` `PRODUCT_NAME` still referenced the old project name `ics_messenger_app`. | Updated to `IVY Messenger` / `ivy_messenger` to match the current repo identity. macOS Xcode scheme and project files updated for consistency. |
+
+---
+
 ## ✅ Fixed in PR #1 (initial hardening)
 
 | # | Severity | Finding | Fix |
 |---|----------|---------|-----|
-| 1 | **Critical** | Firebase Admin SDK service-account private key committed to git (`google-services_Broken.json`) | File deleted from repo; patterns added to `.gitignore`. **Action required: immediately revoke key `[REDACTED]` in the Firebase / Google Cloud Console.** |
+| 1 | **Critical** | Firebase Admin SDK service-account private key committed to git (`google-services_Broken.json`) | File deleted from repo; patterns added to `.gitignore`. **Action required: immediately revoke the exposed key in the Firebase / Google Cloud Console (see PR #4 note above).** |
 | 2 | **Critical** | Redundant Firebase config backup (`google-services_OLD.json`) committed to repo | File deleted from repo. |
 | 3 | **High** | Plaintext user password stored in `SharedPreferences` ("Remember Me" feature) | Password storage removed entirely. Only the username (non-secret) is retained as a UI convenience. |
 | 4 | **High** | Session auth tokens (`matrix_auth_token`, `rocketchat_auth_token`, `rocketchat_user_id`) stored unencrypted in `SharedPreferences` | Migrated to `flutter_secure_storage` (Android Keystore / iOS Keychain). A one-time migration transparently moves existing tokens on first launch. |

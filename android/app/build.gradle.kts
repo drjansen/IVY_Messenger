@@ -16,7 +16,7 @@ if (firebaseConfigFile.exists()) {
     // Re-sync Gradle after adding android/app/google-services.json so the
     // Google services plugin is applied to subsequent builds.
     logger.warn(
-        "[WARN] android/app/google-services.json not found. " +
+        "android/app/google-services.json not found. " +
                 "Firebase will be disabled until you copy the local config from " +
                 "android/app/google-services.json.example."
     )

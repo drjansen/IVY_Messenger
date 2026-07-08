@@ -19,6 +19,14 @@ class FirebaseBootstrap {
         );
         return true;
       }());
+    } catch (error) {
+      _isAvailable = false;
+      assert(() {
+        debugPrint(
+          'Firebase initialization skipped due to an unexpected error. Add local platform config files to enable push notifications: $error',
+        );
+        return true;
+      }());
     }
   }
 }

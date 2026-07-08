@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Network Security Config – ICS Messenger App
+  Network Security Config – IVY Messenger
 
   Policy:
   - Cleartext (plain HTTP) is explicitly prohibited for all destinations.

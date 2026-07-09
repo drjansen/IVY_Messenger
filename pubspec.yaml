@@ -1,0 +1,98 @@
+name: ivy_messenger
+description: "IVY Messenger – a private school communication app for parents and teachers, powered by Rocket.Chat."
+publish_to: 'none'
+
+version: 1.0.1+3
+
+environment:
+  sdk: ">=3.7.2 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  table_calendar: ^3.2.0
+
+  # ✅ Firebase
+  firebase_core: ^4.3.0
+  firebase_messaging: ^16.1.0
+
+  # ✅ Local storage
+  shared_preferences: ^2.5.4
+  flutter_secure_storage: ^9.2.4
+
+  # ✅ HTTP requests
+  http: ^1.6.0
+  http_parser: ^4.1.2
+
+  # ✅ Date formatting
+  intl: ^0.20.2
+
+  # ✅ Device info (for API level checks)
+  device_info_plus: ^12.3.0
+
+  # ✅ Image picker (camera/gallery)
+  image_picker: ^1.2.1
+
+  # ✅ Image cropping
+  image_cropper: ^11.0.0
+
+  # ✅ Emoji parsing
+  flutter_emoji: ^2.5.1
+
+  # ✅ Cached network images
+  cached_network_image: ^3.4.1
+
+  # 🆕 File selection
+  file_selector: ^1.1.0
+
+  # ✅ Cache manager
+  flutter_cache_manager: ^3.4.1
+
+  # ✅ Local notifications
+  flutter_local_notifications: ^21.0.0
+
+  # 🆕 File storage & downloads
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+  # 🔑 Permissions (v2 embedding, fixes Registrar errors)
+  permission_handler: ^12.0.1
+
+  # 🆕 Gallery saving
+  photo_manager: ^3.8.3
+
+  # 🆕 Open files (external apps)
+  open_file: ^3.5.10
+
+  # 🆕 Animated emoji support
+  animated_emoji: ^3.2.1
+
+  # 🆕 File picker (if you need it)
+  file_picker: ^10.3.8
+
+  # 🆕 Multilingual support
+  easy_localization: ^3.0.8
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # ✅ App icon generation
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon.png"
+  remove_alpha_ios: true
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    - assets/langs/
